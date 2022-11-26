@@ -1,0 +1,226 @@
+<html>
+
+<head>
+    <title>Serverless Chat</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.1.3/dist/css/bootstrap.min.css">
+    <script>
+        window.apiBaseUrl = window.location.origin;
+    </script>
+    <style>
+        .slide-fade-enter-active,
+        .slide-fade-leave-active {
+            transition: all 1s ease;
+        }
+
+        .slide-fade-enter,
+        .slide-fade-leave-to {
+            height: 0px;
+            overflow-y: hidden;
+            opacity: 0;
+        }
+    </style>
+</head>
+
+<body>
+    <p>&nbsp;</p>
+    <div id="app" class="container">
+        <div v-if="ready">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h5 class="card-title">Notification Preferences</h5>
+                    <h6 class="card-subtitle mb-2 text-muted">ClientId: {{data.myConnectionId}}</h6>
+                    <div>
+                        <input type="checkbox" id="supervisor" value="supervisor" v-model="topics" @change="onSubscriptionChanged">
+                        <label class="badge badge-pill badge-primary" for="supervisor">Supervisor Update</label>
+                    </div>
+                    <div>
+                        <input type="checkbox" id="meal" value="meal" v-model="topics" @change="onSubscriptionChanged">
+                        <label class="badge badge-pill badge-success" for="meal">Meal update</label>
+                    </div>
+                    <div>
+                        <input type="checkbox" id="aevent" value="aevent" v-model="topics" @change="onSubscriptionChanged">
+                        <label class="badge badge-pill badge-warning" for="aevent">Assign Event</label>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div>
+                        <form v-on:submit.prevent="sendNewMessage">
+                            <h5 class="card-title">Publish notification</h5>
+                            <div class="form-group">
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="sendsupervisor" value="supervisor" v-model="sendtopics">
+                                    <label class="form-check-label badge badge-pill badge-primary" for="sendsupervisor">Supervisor Update</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="sendmeal" value="meal" v-model="sendtopics">
+                                    <label class="form-check-label badge badge-pill badge-success" for="sendmeal">Meal update</label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="sendaevent" value="aevent" v-model="sendtopics">
+                                    <label class="form-check-label badge badge-pill badge-warning" for="sendaevent">Assign Event</label>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <input type="text" v-model="newMessage" id="message-box" class="form-control" placeholder="Type message here and Press ENTER for send it" />
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="row" v-if="!ready">
+            <div class="col-sm">
+                <div>Loading...</div>
+            </div>
+        </div>
+        <div v-if="ready">
+            <transition-group name="slide-fade" tag="div">
+                <div class="mb-3" v-for="message in messages" v-bind:key="message.id">
+                    <div class="col-sm alert alert-primary" v-if="message.Topic=='supervisor'">
+                        <div>
+                            <div>
+                                {{message.From}}: {{ message.Text || message.text }}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-sm alert alert-success" v-if="message.Topic=='meal'">
+                        <div>
+                            <div>
+                                {{message.From}}: {{ message.Text || message.text }}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-sm alert alert-warning" v-if="message.Topic=='aevent'">
+                        <div>
+                            <div>
+                                {{message.From}}: {{ message.Text || message.text }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </transition-group>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.5.17/dist/vue.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@aspnet/signalr@1.0.3/dist/browser/signalr.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios@0.18.0/dist/axios.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/crypto-js@3.1.9-1/crypto-js.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/crypto-js@3.1.9-1/enc-base64.js"></script>
+    <script>
+        const data = {
+            username: '',
+            topics: ["supervisor"],
+            alltopics: ["supervisor", "meal", "aevent"],
+            newMessage: '',
+            messages: [],
+            sendtopics: ["supervisor"],
+            myConnectionId: '',
+            ready: true
+        };
+        const apiBaseUrl = window.location.origin;
+        const app = new Vue({
+            el: '#app',
+            data: data,
+            methods: {
+                sendNewMessage: function () {
+                    var sendTopics = this.sendtopics.join();
+                    var endpoint = apiBaseUrl + "/api/SendMessage?refid=" + data.myConnectionId + "&msg=" + this.newMessage + "&topics=" + sendTopics;
+                    fetch(endpoint, { method: "PUT" }).then(() => this.newMessage = '');
+                },
+                onSubscriptionChanged: function () {
+                    setTopics();
+                }
+            }
+        });
+
+        let counter = 0;
+        data.username = Date.now().toString();
+        console.log("Username: " + data.username);
+        const isAdmin = true;
+        if (!data.username) {
+            alert("No username entered. Reload page and try again.");
+            throw "No username entered";
+        }
+
+        const connection = new signalR.HubConnectionBuilder()
+            .withUrl(apiBaseUrl + '/api', {
+                accessTokenFactory: () => generateAccessToken(data.username)
+            })
+            .configureLogging(signalR.LogLevel.Information)
+            .build();
+        connection.on('setConnectionId', connectionId => {
+            console.log("setConnectionId: " + connectionId);
+            data.myConnectionId = connectionId;
+            setTopics();
+        });
+        connection.on('newMessage', message => {
+            console.log("onNewMessage: " + message);
+            message.id = counter++; // vue transitions need an id
+            data.messages.unshift(message);
+        });
+        connection.on('newConnection', message => {
+            console.log("onNewConnection: " + message);
+        });
+        connection.onclose(() => console.log('disconnected'));
+        console.log('connecting...');
+        connection.start()
+            .then(() => {
+                data.ready = true;
+                console.log('connected!');
+            })
+            .catch(console.error);
+
+        // this function should be in auth server, do not expose your secret
+        function generateAccessToken(userName) {
+            var header = {
+                "alg": "HS256",
+                "typ": "JWT"
+            };
+
+            var stringifiedHeader = CryptoJS.enc.Utf8.parse(JSON.stringify(header));
+            var encodedHeader = base64url(stringifiedHeader);
+
+            // customize your JWT token payload here
+            var data = {
+                "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/nameidentifier": userName,
+                "exp": 1699819025,
+                'admin': isAdmin
+            };
+
+            var stringifiedData = CryptoJS.enc.Utf8.parse(JSON.stringify(data));
+            var encodedData = base64url(stringifiedData);
+
+            var token = encodedHeader + "." + encodedData;
+
+            var secret = "myfunctionauthtest"; // do not expose your secret here
+
+            var signature = CryptoJS.HmacSHA256(token, secret);
+            signature = base64url(signature);
+
+            var signedToken = token + "." + signature;
+
+            return signedToken;
+        }
+        function base64url(source) {
+            // Encode in classical base64
+            encodedSource = CryptoJS.enc.Base64.stringify(source);
+
+            // Remove padding equal characters
+            encodedSource = encodedSource.replace(/=+$/, '');
+
+            // Replace characters according to base64url specifications
+            encodedSource = encodedSource.replace(/\+/g, '-');
+            encodedSource = encodedSource.replace(/\//g, '_');
+
+            return encodedSource;
+        }
+        function setTopics() {
+            var topic = data.topics.join();
+            var leave = data.alltopics.filter(it => !data.topics.includes(it)).join();
+            fetch(apiBaseUrl + "/api/SetTopics?refid=" + data.myConnectionId + "&join=" + topic + "&leave=" + leave, { method: "PUT" });
+        }
+    </script>
+</body>
+
+</html>
