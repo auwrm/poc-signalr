@@ -8,23 +8,18 @@ namespace TTSS.Infrastructure.Data.Mongo
         private IFindFluent<T, T> findResult;
         private readonly CancellationToken cancellationToken;
         private readonly int pageSize;
-        private readonly int totalDocumentCount;
+        private readonly int totalCount;
 
         public MongoPagingResult(IFindFluent<T, T> findResult, CancellationToken cancellationToken, bool totalCount = false, int pageSize = 0)
         {
             this.findResult = findResult;
             this.cancellationToken = cancellationToken;
             this.pageSize = pageSize;
-            this.totalDocumentCount = totalCount ? (int)this.findResult.CountDocuments(cancellationToken) : 0;
+            this.totalCount = totalCount ? (int)this.findResult.CountDocuments(cancellationToken) : 0;
         }
 
         public PagingResult<T> GetPage(int pageNo)
-        {
-            int page = pageNo;
-            var data = getPageDataInternal(pageNo);
-
-            return new PagingResult<T>(data, pageSize, 0, () => totalDocumentCount);
-        }
+            => new PagingResult<T>(getPageDataInternal(pageNo), pageSize, pageNo, () => totalCount);
 
         public Task<IEnumerable<T>> GetDataAsync(int pageNo)
             => getPageDataInternal(pageNo);
