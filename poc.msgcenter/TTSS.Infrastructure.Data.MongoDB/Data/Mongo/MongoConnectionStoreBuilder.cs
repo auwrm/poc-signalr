@@ -22,12 +22,14 @@ namespace TTSS.Infrastructure.Data.Mongo
             return this;
         }
 
-        public MongoConnectionStoreBuilder RegisterCollection<T>(string? collectionName = default)
+        public MongoConnectionStoreBuilder RegisterCollection<T>(string? collectionName = default, bool noDiscriminator = default, bool isChild = false)
             where T : class, new()
         {
-            var connection = string.IsNullOrEmpty(currentConnectionString)
+            var connection = string.IsNullOrEmpty(collectionName)
                 ? new MongoConnection<T>(currentDatabaseName, currentConnectionString)
                 : new MongoConnection<T>(collectionName, currentDatabaseName, currentConnectionString);
+            connection.IsChild = isChild;
+            connection.NoDiscriminator = noDiscriminator;
             mongoConnectionStore.Add(connection);
             return this;
         }

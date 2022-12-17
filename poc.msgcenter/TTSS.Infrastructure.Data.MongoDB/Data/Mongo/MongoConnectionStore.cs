@@ -1,4 +1,5 @@
-﻿using MongoDB.Driver;
+﻿using MongoDB.Bson.Serialization;
+using MongoDB.Driver;
 using System.Collections.Concurrent;
 using TTSS.Infrastructure.Data.Mongo.Models;
 
@@ -22,9 +23,18 @@ namespace TTSS.Infrastructure.Data.Mongo
             if (!clients?.TryGetValue(connection.ConnectionString, out client) ?? false)
                 throw new ArgumentOutOfRangeException($"Database '{connection.DatabaseName}' not found.");
 
+            if (!BsonClassMap.IsClassMapRegistered(typeof(T)))
+            {
+                BsonClassMap.RegisterClassMap<T>(it =>
+                {
+                    it.AutoMap();
+                    it.SetIsRootClass(!connection.IsChild);
+                });
+            }
+
             var database = client?.GetDatabase(connection.DatabaseName);
             var collection = database?.GetCollection<T>(connection.CollectionName);
-            return (connection?.CollectionName, collection?.OfType<T>());
+            return (connection.CollectionName, connection.NoDiscriminator ? collection : collection?.OfType<T>());
         }
 
         internal MongoConnectionStore Build()

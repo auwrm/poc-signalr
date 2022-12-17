@@ -11,8 +11,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="AutoFixture.AutoMoq" Version="4.17.0" />
+    <PackageReference Include="AutoFixture.Xunit2" Version="4.17.0" />
     <PackageReference Include="FluentAssertions" Version="6.8.0" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.3.2" />
+    <PackageReference Include="Mongo2Go" Version="3.1.3" />
     <PackageReference Include="xunit" Version="2.4.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="2.4.5">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -28,10 +31,6 @@
     <ProjectReference Include="..\..\TTSS.Infrastructure.Data.MongoDB\TTSS.Infrastructure.Data.MongoDB.csproj" />
     <ProjectReference Include="..\..\TTSS.Infrastructure\TTSS.Infrastructure.csproj" />
     <ProjectReference Include="..\TTSS.TestHelpers.XUnit\TTSS.TestHelpers.XUnit.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Infrastructure\Data\Mongo\Tests\" />
   </ItemGroup>
 
 </Project>

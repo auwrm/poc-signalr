@@ -71,15 +71,22 @@
   <Class Name="TTSS.Infrastructure.Data.Mongo.Models.MongoConnection">
     <Position X="11.75" Y="0.5" Width="2.5" />
     <TypeIdentifier>
-      <HashCode>AAAAQAAAAAAAAAAAAAAAAAAAAAAAABAAACAAAAABAAA=</HashCode>
+      <HashCode>AAAAQAAAAAAAAAAAAAAAAAAAAAAAABBAACAAAAABAAA=</HashCode>
       <FileName>Data\Mongo\Models\MongoConnection.cs</FileName>
     </TypeIdentifier>
   </Class>
   <Class Name="TTSS.Infrastructure.Data.Mongo.Models.MongoConnection&lt;T&gt;">
-    <Position X="11.75" Y="2.5" Width="2.5" />
+    <Position X="11.75" Y="2.75" Width="2.5" />
     <TypeIdentifier>
       <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
       <FileName>Data\Mongo\Models\MongoConnection.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="TTSS.Infrastructure.Data.Mongo.Models.MongoDocumentBase">
+    <Position X="11.75" Y="4.25" Width="1.75" />
+    <TypeIdentifier>
+      <HashCode>AAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Data\Mongo\Models\MongoDocumentBase.cs</FileName>
     </TypeIdentifier>
   </Class>
   <Font Name="Segoe UI" Size="9" />
