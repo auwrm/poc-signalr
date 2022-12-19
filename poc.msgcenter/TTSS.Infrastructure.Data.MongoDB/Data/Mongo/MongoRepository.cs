@@ -1,5 +1,6 @@
 ﻿using MongoDB.Driver;
 using System.Linq.Expressions;
+using TTSS.Infrastructure.Models;
 
 namespace TTSS.Infrastructure.Data.Mongo
 {
@@ -8,6 +9,7 @@ namespace TTSS.Infrastructure.Data.Mongo
         IQueryRepository<T, K>,
         IDeletableRepository<T, K>,
         IInsertBulkRepository<T>
+        where T : IDbModel<K>
     {
         protected internal readonly string CollectionName;
         protected internal readonly IMongoCollection<T> Collection;

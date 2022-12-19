@@ -1,4 +1,5 @@
 ﻿using TTSS.Infrastructure.Data.Mongo.Models;
+using TTSS.Infrastructure.Models;
 
 namespace TTSS.Infrastructure.Data.Mongo
 {
@@ -23,7 +24,7 @@ namespace TTSS.Infrastructure.Data.Mongo
         }
 
         public MongoConnectionStoreBuilder RegisterCollection<T>(string? collectionName = default, bool noDiscriminator = default, bool isChild = false)
-            where T : class, new()
+            where T : IDbModelBase
         {
             var connection = string.IsNullOrEmpty(collectionName)
                 ? new MongoConnection<T>(currentDatabaseName, currentConnectionString)

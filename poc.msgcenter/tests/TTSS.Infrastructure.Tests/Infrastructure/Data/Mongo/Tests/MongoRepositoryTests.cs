@@ -2,6 +2,7 @@
 using FluentAssertions;
 using Mongo2Go;
 using MongoDB.Driver;
+using TTSS.Infrastructure.Models;
 using TTSS.TestHelpers.XUnit;
 using Xunit.Abstractions;
 
@@ -122,6 +123,7 @@ namespace TTSS.Infrastructure.Data.Mongo.Tests
         }
 
         private async Task insertAndValidate<T, K>(T data, K id, MongoRepository<T, K> sut, int expectedCount)
+            where T : IDbModel<K>
         {
             await sut.InsertAsync(data);
             var actual = await sut.GetByIdAsync(id);

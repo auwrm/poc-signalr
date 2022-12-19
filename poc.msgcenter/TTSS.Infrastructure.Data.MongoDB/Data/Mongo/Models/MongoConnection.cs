@@ -1,4 +1,6 @@
-﻿namespace TTSS.Infrastructure.Data.Mongo.Models
+﻿using TTSS.Infrastructure.Models;
+
+namespace TTSS.Infrastructure.Data.Mongo.Models
 {
     public class MongoConnection
     {
@@ -9,8 +11,8 @@
         public bool NoDiscriminator { get; set; }
         public bool IsChild { get; set; }
     }
-    public class MongoConnection<T> : MongoConnection 
-        where T : class, new()
+    public class MongoConnection<T> : MongoConnection
+        where T : IDbModelBase
     {
         public MongoConnection(string collectionName, string databaseName, string connectionString)
         {
