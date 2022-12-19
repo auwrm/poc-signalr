@@ -15,9 +15,15 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TTSS.Infrastructure.Data.Mo
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{C89153DA-A9B2-45E3-B685-DAAC106CB300}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TTSS.TestHelpers.XUnit", "tests\TTSS.TestHelpers.XUnit\TTSS.TestHelpers.XUnit.csproj", "{06A9353C-7EB2-42F3-BF52-C8765582BF3F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TTSS.TestHelpers.XUnit", "tests\TTSS.TestHelpers.XUnit\TTSS.TestHelpers.XUnit.csproj", "{06A9353C-7EB2-42F3-BF52-C8765582BF3F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TTSS.Infrastructure.Tests", "tests\TTSS.Infrastructure.Tests\TTSS.Infrastructure.Tests.csproj", "{65DEC76F-605D-492D-B5B6-25EA41EB5146}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TTSS.Infrastructure.Tests", "tests\TTSS.Infrastructure.Tests\TTSS.Infrastructure.Tests.csproj", "{65DEC76F-605D-492D-B5B6-25EA41EB5146}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "shared", "shared", "{03719B40-BB8E-498E-99F3-37653DE0DD86}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TTSS.WebFacing.Common", "TTSS.WebFacing.Common\TTSS.WebFacing.Common.csproj", "{855AE3C3-F305-4B58-9144-F730671E1DE8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StormApi", "StormApi\StormApi.csproj", "{48BC7FB4-3B53-4CFE-A454-AB3ED2C74568}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -49,6 +55,14 @@ Global
 		{65DEC76F-605D-492D-B5B6-25EA41EB5146}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{65DEC76F-605D-492D-B5B6-25EA41EB5146}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{65DEC76F-605D-492D-B5B6-25EA41EB5146}.Release|Any CPU.Build.0 = Release|Any CPU
+		{855AE3C3-F305-4B58-9144-F730671E1DE8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{855AE3C3-F305-4B58-9144-F730671E1DE8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{855AE3C3-F305-4B58-9144-F730671E1DE8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{855AE3C3-F305-4B58-9144-F730671E1DE8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{48BC7FB4-3B53-4CFE-A454-AB3ED2C74568}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{48BC7FB4-3B53-4CFE-A454-AB3ED2C74568}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{48BC7FB4-3B53-4CFE-A454-AB3ED2C74568}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{48BC7FB4-3B53-4CFE-A454-AB3ED2C74568}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -60,6 +74,7 @@ Global
 		{C89153DA-A9B2-45E3-B685-DAAC106CB300} = {F1523265-E853-4A8F-96AA-DED552AFF8F7}
 		{06A9353C-7EB2-42F3-BF52-C8765582BF3F} = {C89153DA-A9B2-45E3-B685-DAAC106CB300}
 		{65DEC76F-605D-492D-B5B6-25EA41EB5146} = {C89153DA-A9B2-45E3-B685-DAAC106CB300}
+		{855AE3C3-F305-4B58-9144-F730671E1DE8} = {03719B40-BB8E-498E-99F3-37653DE0DD86}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {F902D77A-93AD-4B5D-B7A0-35B5626F9038}
