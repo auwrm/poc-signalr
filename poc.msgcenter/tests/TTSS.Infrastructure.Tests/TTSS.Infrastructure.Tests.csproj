@@ -29,6 +29,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\TTSS.Infrastructure.Data.MongoDB\TTSS.Infrastructure.Data.MongoDB.csproj" />
+    <ProjectReference Include="..\..\TTSS.Infrastructure.Services.MessagingCenter\TTSS.Infrastructure.Services.MessagingCenter.csproj" />
     <ProjectReference Include="..\..\TTSS.Infrastructure\TTSS.Infrastructure.csproj" />
     <ProjectReference Include="..\TTSS.TestHelpers.XUnit\TTSS.TestHelpers.XUnit.csproj" />
   </ItemGroup>
