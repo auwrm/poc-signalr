@@ -1,5 +1,6 @@
 ﻿using TTSS.Infrastructure.Services.Models;
 using TTSS.Infrastructure.Services.Models.Configs;
+using TTSS.Infrastructure.Services.Validators;
 
 namespace TTSS.Infrastructure.Services
 {
@@ -20,11 +21,9 @@ namespace TTSS.Infrastructure.Services
 
         public async Task<SendMessageResponse> Send(IEnumerable<SendMessage> messages)
         {
-            var isArgumentValid = (messages?.Any() ?? false)
-                && !messages.Any(it => string.IsNullOrWhiteSpace(it.Nonce) || null == it.Filter || false == (it.TargetGroups?.Any() ?? false));
-            if (!isArgumentValid)
+            if (!messages.Validate())
             {
-                return new SendMessageResponse
+                return new()
                 {
                     ErrorMessage = "Nonce, Filter and TargetGroup can't be null or empty.",
                 };
@@ -33,9 +32,9 @@ namespace TTSS.Infrastructure.Services
             var rsp = await restService.Post<IEnumerable<SendMessage>, SendMessageResponse>(msgCenterHostUrl, messages);
             if (false == (rsp?.IsSuccessStatusCode ?? false))
             {
-                return new SendMessageResponse
+                return new()
                 {
-                    NonceStatus = rsp?.Data.NonceStatus,
+                    NonceStatus = rsp?.Data?.NonceStatus ?? new Dictionary<string, bool>(),
                     ErrorMessage = "Can't send message to the Messaging Center Service",
                 };
             }

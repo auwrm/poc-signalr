@@ -5,11 +5,10 @@
         public abstract string Type { get; }
     }
 
-    public class DynamicContent<T> : MessageContent
-        where T : class, new()
+    public class DynamicContent : MessageContent
     {
-        public T Content { get; set; }
-        public string ContentType => typeof(T).Name;
+        public object Data { get; set; }
+        public string ContentType => Data.GetType().Name;
         public override string Type => MessageType.Dynamic.ToString();
     }
 
