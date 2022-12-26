@@ -7,7 +7,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\TTSS.Infrastructure.Contracts\TTSS.Infrastructure.Contracts.csproj" />
+    <ProjectReference Include="..\..\TTSS.Infrastructure.Data.MongoDB\TTSS.Infrastructure.Data.MongoDB.csproj" />
+    <ProjectReference Include="..\..\TTSS.Infrastructure.Services.MessagingCenter\TTSS.Infrastructure.Services.MessagingCenter.csproj" />
+    <ProjectReference Include="..\..\TTSS.Infrastructure\TTSS.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="DbModels\" />
   </ItemGroup>
 
 </Project>

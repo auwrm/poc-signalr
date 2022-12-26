@@ -4,6 +4,7 @@ using AutoFixture.Xunit2;
 using FluentAssertions;
 using Moq;
 using TTSS.Infrastructure.Services.Models;
+using TTSS.Infrastructure.Services.Models.Configs;
 using TTSS.TestHelpers.XUnit;
 using Xunit.Abstractions;
 
@@ -14,12 +15,15 @@ namespace TTSS.Infrastructure.Services.Tests
         private IFixture fixture;
         private IMessagingCenter sut;
         private Mock<IRestService> restServiceMock;
-
+        private MessagingCenterOptions msgCenterOpt;
+        private const string HostUrl = "https://www.msgcenter.com";
         public MessagingCenterTests(ITestOutputHelper testOutput) : base(testOutput)
         {
             fixture = new Fixture()
                 .Customize(new AutoMoqCustomization());
             restServiceMock = fixture.Freeze<Mock<IRestService>>();
+            msgCenterOpt = fixture.Freeze<MessagingCenterOptions>();
+            msgCenterOpt.HostUrl = HostUrl;
             sut = fixture.Create<MessagingCenter>();
         }
 
@@ -43,18 +47,13 @@ namespace TTSS.Infrastructure.Services.Tests
 
         private async Task validate_AllMessagesHaveBeenSent(IEnumerable<SendMessage> messages)
         {
-            var data = fixture.Create<SendMessageResponse>();
+            var result = fixture.Create<RestResponse<SendMessageResponse>>();
             restServiceMock
                 .Setup(it => it.Post<IEnumerable<SendMessage>, SendMessageResponse>(It.IsAny<string>(), It.IsAny<IEnumerable<SendMessage>>()))
-                .Returns<string, IEnumerable<SendMessage>>((url, req) => Task.FromResult(new RestResponse<SendMessageResponse>
-                {
-                    Data = data,
-                    StatusCode = 200,
-                    IsSuccessStatusCode = true,
-                }));
-            (await sut.Send(messages)).Should().BeEquivalentTo(data);
+                .Returns<string, IEnumerable<SendMessage>>((_, _) => Task.FromResult(result));
+            (await sut.Send(messages)).Should().BeEquivalentTo(result.Data);
             restServiceMock.Verify(it => it.Post<IEnumerable<SendMessage>, SendMessageResponse>(
-                It.IsAny<string>(),
+                It.Is<string>(actual => actual == HostUrl),
                 It.Is<IEnumerable<SendMessage>>(actual => actual == messages)), Times.Once());
         }
 
@@ -66,7 +65,7 @@ namespace TTSS.Infrastructure.Services.Tests
             var rsp = await sut.Send(messages);
             rsp.ErrorMessage.Should().NotBeNullOrWhiteSpace();
             restServiceMock.Verify(it => it.Post<IEnumerable<SendMessage>, SendMessageResponse>(
-                It.IsAny<string>(),
+                It.Is<string>(actual => actual == HostUrl),
                 It.IsAny<IEnumerable<SendMessage>>()), Times.Never());
         }
         public class InvalidDynamicMessages : TheoryData<IEnumerable<SendMessage<DynamicContent>>>
@@ -314,10 +313,107 @@ namespace TTSS.Infrastructure.Services.Tests
         {
             restServiceMock
                 .Setup(it => it.Post<IEnumerable<SendMessage>, SendMessageResponse>(It.IsAny<string>(), It.IsAny<IEnumerable<SendMessage>>()))
-                .Returns<string, IEnumerable<SendMessage>>((url, req) => Task.FromResult(response));
+                .Returns<string, IEnumerable<SendMessage>>((_, _) => Task.FromResult(response));
             var actual = await sut.Send(fixture.Create<IEnumerable<SendMessage<NotificationContent>>>());
             actual.ErrorMessage.Should().NotBeNullOrWhiteSpace();
             actual.NonceStatus.Should().BeEmpty();
+        }
+
+        #endregion
+
+        #region SyncMessage
+
+        [Fact]
+        public Task SyncMessage_WithAllDataValid_ThenSystemCallSync()
+            => validateCallSyncMessage();
+
+        [Fact]
+        public Task SyncMessage_WithInsecureHostScheme_ThenSystemMustCalloutWithHttps()
+        {
+            const string InsecureHostUrl = "http://www.msgcenter.com";
+            msgCenterOpt.HostUrl = InsecureHostUrl;
+            return validateCallSyncMessage();
+        }
+
+        private async Task validateCallSyncMessage()
+        {
+            var result = fixture.Create<RestResponse<MessagePack>>();
+            restServiceMock
+                .Setup(it => it.Get<MessagePack>(It.IsAny<string>()))
+                .Returns<string>(_ => Task.FromResult(result));
+            var actual = await sut.SyncMessage(new GetMessages
+            {
+                UserId = "u1",
+                FromGroup = "g1",
+                FromMessageId = 0,
+                Filter = new()
+                {
+                    Scopes = new[] { "s1", "s2" },
+                    Activities = new[] { "a1", "a2", "a3" },
+                }
+            });
+            actual.Should().Be(result.Data);
+            var expectedCallEndpoint = $"https://www.msgcenter.com/u1/g1/0?scopes=s1,s2&activities=a1,a2,a3";
+            restServiceMock.Verify(it => it.Get<MessagePack>(It.Is<string>(actual => actual == expectedCallEndpoint)), Times.Once());
+        }
+
+        [Theory]
+        [InlineData("s1,s2,s1,s3,s2", "a0", "s1,s2,s3", "a0")]
+        [InlineData("s0", "a1,a2,a1,a3,a2", "s0", "a1,a2,a3")]
+        public async Task SyncMessage_WithSomeDuplicatedValue_ThenSystemMustRemoveTheDuplicatedValue(string scopes, string activities, string expectedScope, string expectedActivity)
+        {
+            var result = fixture.Create<RestResponse<MessagePack>>();
+            restServiceMock
+                .Setup(it => it.Get<MessagePack>(It.IsAny<string>()))
+                .Returns<string>(_ => Task.FromResult(result));
+
+            var input = fixture.Create<GetMessages>();
+            input.Filter.Scopes = scopes.Split(',', StringSplitOptions.RemoveEmptyEntries);
+            input.Filter.Activities = activities.Split(',', StringSplitOptions.RemoveEmptyEntries);
+            var actual = await sut.SyncMessage(input);
+
+            actual.Should().Be(result.Data);
+            restServiceMock.Verify(it => it.Get<MessagePack>(It.Is<string>(actual => actual.Contains(expectedScope) && actual.Contains(expectedActivity))), Times.Once());
+        }
+
+        [Theory]
+        [InlineData("")]
+        [InlineData(" ")]
+        [InlineData(null)]
+        [InlineData("valid", "")]
+        [InlineData("valid", " ")]
+        [InlineData("valid", null)]
+        [InlineData("valid", "valid", -1)]
+        [InlineData("valid", "valid", 0, "")]
+        [InlineData("valid", "valid", 0, " ")]
+        [InlineData("valid", "valid", 0, null)]
+        [InlineData("valid", "valid", 0, "valid", "")]
+        [InlineData("valid", "valid", 0, "valid", " ")]
+        [InlineData("valid", "valid", 0, "valid", null)]
+        public Task SyncMessage_WithDataInvalid_ThenReceiveAnError(string userId = "valid", string group = "valid", long msgId = 0, string scope = "valid", string activity = "valid")
+            => validateInvalidInputMustNotCrashThisModule(new GetMessages
+            {
+                UserId = userId,
+                FromGroup = group,
+                FromMessageId = msgId,
+                Filter = new()
+                {
+                    Scopes = new[] { scope },
+                    Activities = new[] { activity },
+                }
+            });
+
+        [Fact]
+        public Task SyncMessage_WithParameterIsNull_ThenTheSystemMustNotCrash()
+            => validateInvalidInputMustNotCrashThisModule(null);
+
+        private async Task validateInvalidInputMustNotCrashThisModule(GetMessages param)
+        {
+            var actual = await sut.SyncMessage(param);
+            actual.Messages.Should().BeEmpty();
+            actual.HasMorePages.Should().BeFalse();
+            actual.LastMessageId.Should().Be(0);
+            restServiceMock.Verify(it => it.Get<MessagePack>(It.IsAny<string>()), Times.Never());
         }
 
         #endregion

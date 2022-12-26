@@ -1,28 +1,28 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <ClassDiagram MajorVersion="1" MinorVersion="1" MembersFormat="NameAndType">
   <Class Name="TTSS.Infrastructure.Services.Models.ClearAllMessages">
-    <Position X="15.5" Y="4.25" Width="1.5" />
+    <Position X="14.75" Y="4.25" Width="1.5" />
     <TypeIdentifier>
       <HashCode>AAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAAAAAAAAAAAAA=</HashCode>
       <FileName>Services\Models\ClearAllMessages.cs</FileName>
     </TypeIdentifier>
   </Class>
   <Class Name="TTSS.Infrastructure.Services.Models.GetMessages">
-    <Position X="15.5" Y="0.5" Width="2" />
+    <Position X="14.75" Y="0.5" Width="2" />
     <TypeIdentifier>
       <HashCode>QAAAAAAAAAAAAAAAAAAAAAgAABAAAAAEAAAAAAAAAAA=</HashCode>
       <FileName>Services\Models\GetMessages.cs</FileName>
     </TypeIdentifier>
   </Class>
   <Class Name="TTSS.Infrastructure.Services.Models.Message">
-    <Position X="7.25" Y="5.5" Width="2" />
+    <Position X="7.75" Y="5.5" Width="2" />
     <TypeIdentifier>
       <HashCode>AAgCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAAAAAAA=</HashCode>
       <FileName>Services\Models\Message.cs</FileName>
     </TypeIdentifier>
   </Class>
   <Class Name="TTSS.Infrastructure.Services.Models.Message&lt;T&gt;">
-    <Position X="9.75" Y="5.5" Width="1.5" />
+    <Position X="10.25" Y="5.5" Width="1.5" />
     <Members>
       <Method Name="Message" Hidden="true" />
     </Members>
@@ -32,33 +32,19 @@
     </TypeIdentifier>
   </Class>
   <Class Name="TTSS.Infrastructure.Services.Models.MessageContent">
-    <Position X="9" Y="0.5" Width="1.75" />
+    <Position X="9.5" Y="0.5" Width="1.75" />
     <TypeIdentifier>
       <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAA=</HashCode>
       <FileName>Services\Models\MessageContent.cs</FileName>
     </TypeIdentifier>
   </Class>
-  <Class Name="TTSS.Infrastructure.Services.Models.DynamicContent&lt;T&gt;">
-    <Position X="11.25" Y="1.5" Width="1.75" />
-    <InheritanceLine Type="TTSS.Infrastructure.Services.Models.MessageContent" FixedFromPoint="true" FixedToPoint="true">
-      <Path>
-        <Point X="9.875" Y="1.603" />
-        <Point X="9.875" Y="2.313" />
-        <Point X="11.25" Y="2.313" />
-      </Path>
-    </InheritanceLine>
-    <TypeIdentifier>
-      <HashCode>AAAAAAAAAgAAAAAAAAAAAAAAAAAAAAAAAQAQAAAAAAA=</HashCode>
-      <FileName>Services\Models\MessageContent.cs</FileName>
-    </TypeIdentifier>
-  </Class>
   <Class Name="TTSS.Infrastructure.Services.Models.NotificationContent">
-    <Position X="11.25" Y="3.25" Width="1.75" />
+    <Position X="11.75" Y="3.25" Width="1.75" />
     <InheritanceLine Type="TTSS.Infrastructure.Services.Models.MessageContent" FixedToPoint="true">
       <Path>
-        <Point X="9.875" Y="1.603" />
-        <Point X="9.875" Y="4.062" />
-        <Point X="11.25" Y="4.062" />
+        <Point X="10.375" Y="1.603" />
+        <Point X="10.375" Y="4.062" />
+        <Point X="11.75" Y="4.062" />
       </Path>
     </InheritanceLine>
     <TypeIdentifier>
@@ -67,28 +53,28 @@
     </TypeIdentifier>
   </Class>
   <Class Name="TTSS.Infrastructure.Services.Models.MessageFilter">
-    <Position X="4.25" Y="2.25" Width="2.5" />
+    <Position X="4.75" Y="2.25" Width="2.5" />
     <TypeIdentifier>
       <HashCode>AAAAAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAAAIAAAAA=</HashCode>
       <FileName>Services\Models\MessageFilter.cs</FileName>
     </TypeIdentifier>
   </Class>
   <Class Name="TTSS.Infrastructure.Services.Models.MessagePack">
-    <Position X="4" Y="5.5" Width="2.75" />
+    <Position X="4.5" Y="5.5" Width="2.75" />
     <TypeIdentifier>
       <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAEAAQAAAAA=</HashCode>
       <FileName>Services\Models\MessagePack.cs</FileName>
     </TypeIdentifier>
   </Class>
   <Class Name="TTSS.Infrastructure.Services.Models.SendMessage">
-    <Position X="4" Y="0.5" Width="2.75" />
+    <Position X="4.5" Y="0.5" Width="2.75" />
     <TypeIdentifier>
       <HashCode>AAAAAAAAAAAAAAAAAAAIAAAAABAAAAAAAAAAAAAACAA=</HashCode>
       <FileName>Services\Models\SendMessage.cs</FileName>
     </TypeIdentifier>
   </Class>
   <Class Name="TTSS.Infrastructure.Services.Models.SendMessage&lt;T&gt;">
-    <Position X="7.25" Y="0.5" Width="1.5" />
+    <Position X="7.75" Y="0.5" Width="1.5" />
     <Members>
       <Method Name="SendMessage" Hidden="true" />
     </Members>
@@ -98,21 +84,85 @@
     </TypeIdentifier>
   </Class>
   <Class Name="TTSS.Infrastructure.Services.Models.UpdateMessageTracker">
-    <Position X="15.5" Y="2.5" Width="2" />
+    <Position X="14.75" Y="2.5" Width="2" />
     <TypeIdentifier>
       <HashCode>AAAAQAAAAAAAAAAAAAAAAAgAAAAAAAAEAAAAAAAAAAA=</HashCode>
       <FileName>Services\Models\UpdateMessageTracker.cs</FileName>
     </TypeIdentifier>
   </Class>
+  <Class Name="TTSS.Infrastructure.Services.Models.Configs.MessagingCenterOptions">
+    <Position X="17.25" Y="3.25" Width="2" />
+    <TypeIdentifier>
+      <HashCode>AAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Services\Models\Configs\MessagingCenterOptions.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="TTSS.Infrastructure.Services.Models.DynamicContent">
+    <Position X="11.75" Y="1.5" Width="1.75" />
+    <InheritanceLine Type="TTSS.Infrastructure.Services.Models.MessageContent" FixedToPoint="true">
+      <Path>
+        <Point X="10.375" Y="1.603" />
+        <Point X="10.375" Y="2.375" />
+        <Point X="11.75" Y="2.375" />
+      </Path>
+    </InheritanceLine>
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAQAQAAAAAAA=</HashCode>
+      <FileName>Services\Models\MessageContent.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="TTSS.Infrastructure.Services.Models.SendMessageResponse">
+    <Position X="17.25" Y="4.5" Width="3" />
+    <TypeIdentifier>
+      <HashCode>AQAAAAAAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Services\Models\SendMessageResponse.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="TTSS.Infrastructure.Services.Validators.MessageContentValidator">
+    <Position X="17.25" Y="0.5" Width="2.25" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Services\Validators\MessageContentValidator.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="TTSS.Infrastructure.Services.Validators.SendMessageValidator">
+    <Position X="17.25" Y="1.75" Width="2.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAIAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Services\Validators\SendMessageValidator.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="TTSS.Infrastructure.Services.MessagingCenter" Collapsed="true" BaseTypeListCollapsed="true">
+    <Position X="0.5" Y="3.25" Width="1.5" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAABAAAgABAAEAAAAAAAAAAQAAAEAgAAAAAAAA=</HashCode>
+      <FileName>Services\MessagingCenter.cs</FileName>
+    </TypeIdentifier>
+    <Lollipop Position="0.2" />
+  </Class>
+  <Class Name="TTSS.Infrastructure.Services.Validators.GetMessagesValidator">
+    <Position X="20" Y="1.75" Width="1.75" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Services\Validators\GetMessagesValidator.cs</FileName>
+    </TypeIdentifier>
+  </Class>
+  <Class Name="TTSS.Infrastructure.Services.Validators.MessageFilterValidator">
+    <Position X="19.75" Y="0.5" Width="2" />
+    <TypeIdentifier>
+      <HashCode>AAAAAAAAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=</HashCode>
+      <FileName>Services\Validators\MessageFilterValidator.cs</FileName>
+    </TypeIdentifier>
+  </Class>
   <Interface Name="TTSS.Infrastructure.Services.IMessagingCenter">
-    <Position X="0.5" Y="0.5" Width="3" />
+    <Position X="0.5" Y="0.5" Width="3.75" />
     <TypeIdentifier>
       <HashCode>AAAAAAAABAAAgABAAEAAAAAAAAAAAAAAEAgAAAAAAAA=</HashCode>
       <FileName>Services\IMessagingCenter.cs</FileName>
     </TypeIdentifier>
   </Interface>
   <Enum Name="TTSS.Infrastructure.Services.MessageType">
-    <Position X="15.5" Y="5.5" Width="1.5" />
+    <Position X="14.75" Y="5.5" Width="1.5" />
     <TypeIdentifier>
       <HashCode>AAAAAAAAAAAAAAABAAAAAAAAAAAAQAAAAAAAAAAAAAA=</HashCode>
       <FileName>Services\MessageType.cs</FileName>

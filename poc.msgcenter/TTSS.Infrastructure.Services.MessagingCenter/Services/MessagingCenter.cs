@@ -16,33 +16,34 @@ namespace TTSS.Infrastructure.Services
             msgCenterHostUrl = msgCenterOptions?.HostUrl ?? throw new ArgumentNullException(nameof(msgCenterOptions));
         }
 
-        public Task<SendMessageResponse> Send(SendMessage message)
+        public Task<SendMessageResponse?> Send(SendMessage message)
             => Send(new[] { message });
 
-        public async Task<SendMessageResponse> Send(IEnumerable<SendMessage> messages)
+        public async Task<SendMessageResponse?> Send(IEnumerable<SendMessage> messages)
         {
-            if (!messages.Validate())
-            {
-                return new()
-                {
-                    ErrorMessage = "Nonce, Filter and TargetGroup can't be null or empty.",
-                };
-            }
+            if (!messages.Validate()) return createError("Nonce, Filter and TargetGroup can't be null or empty.");
 
             var rsp = await restService.Post<IEnumerable<SendMessage>, SendMessageResponse>(msgCenterHostUrl, messages);
-            if (false == (rsp?.IsSuccessStatusCode ?? false))
-            {
-                return new()
-                {
-                    NonceStatus = rsp?.Data?.NonceStatus ?? new Dictionary<string, bool>(),
-                    ErrorMessage = "Can't send message to the Messaging Center Service",
-                };
-            }
+            return (rsp?.IsSuccessStatusCode ?? false) ? rsp.Data : createError("Can't send message to the Messaging Center Service", rsp?.Data?.NonceStatus);
 
-            return rsp?.Data;
+            SendMessageResponse createError(string msg, IDictionary<string, bool> status = default)
+                => new() { ErrorMessage = msg, NonceStatus = status ?? new Dictionary<string, bool>() };
         }
 
-        public Task<MessagePack> SyncMessage(GetMessages request) => throw new NotImplementedException();
+        public async Task<MessagePack> SyncMessage(GetMessages request)
+        {
+            if (!request.Validate()) return new() { Messages = Enumerable.Empty<Message>() };
+
+            var builder = new UriBuilder(msgCenterHostUrl);
+            builder.Scheme = "https";
+            builder.Path = $"{request.UserId}/{request.FromGroup}/{request.FromMessageId}";
+            var scopes = $"scopes={string.Join(',', request.Filter.Scopes.Distinct())}";
+            var activities = $"activities={string.Join(',', request.Filter.Activities.Distinct())}";
+            builder.Query = $"{scopes}&{activities}";
+            var rsp = await restService.Get<MessagePack>(builder.Uri.AbsoluteUri);
+            return (rsp?.IsSuccessStatusCode ?? false) ? rsp.Data : new() { Messages = Enumerable.Empty<Message>() };
+        }
+
         public Task<MessagePack> GetNewMessages(GetMessages request) => throw new NotImplementedException();
         public Task<MessagePack> GetMoreMessages(GetMessages request) => throw new NotImplementedException();
         public Task<bool> UpdateMessageTracker(UpdateMessageTracker request) => throw new NotImplementedException();
