@@ -89,6 +89,17 @@ namespace TTSS.Infrastructure.Services
             return true;
         }
 
-        public Task<bool> ClearAllMessages(ClearAllMessages request) => throw new NotImplementedException();
+        public async Task<bool> ClearAllMessages(ClearAllMessages request)
+        {
+            if (!request.Validate()) return false;
+
+            var builder = new UriBuilder
+            {
+                Host = HostUrl,
+                Scheme = "https",
+            };
+            await restService.Put(builder.Uri.AbsoluteUri, request);
+            return true;
+        }
     }
 }

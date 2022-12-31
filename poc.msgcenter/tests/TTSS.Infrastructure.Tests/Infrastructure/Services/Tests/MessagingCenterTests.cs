@@ -498,7 +498,6 @@ namespace TTSS.Infrastructure.Services.Tests
         [Fact]
         public async Task UpdateMessageTracker_AllDataValid_ThenCallTheApi()
         {
-            var req = fixture.Create<UpdateMessageTracker>();
             var result = fixture.Create<RestResponse<bool>>();
             restServiceMock
                 .Setup(it => it.Put(It.IsAny<string>()))
@@ -537,6 +536,29 @@ namespace TTSS.Infrastructure.Services.Tests
             actual.Should().BeFalse();
 
             restServiceMock.Verify(it => it.Put(It.IsAny<string>()), Times.Never());
+        }
+
+        #endregion
+
+        #region ClearAllMessages
+
+        [Fact]
+        public async Task ClearAllMessages_AllDataValid_ThenCallTheApi()
+        {
+            var result = fixture.Create<RestResponse<bool>>();
+            restServiceMock
+                .Setup(it => it.Post(It.IsAny<string>(),It.IsAny<ClearAllMessages>()))
+                .Returns<string>(_ => Task.CompletedTask);
+            var actual = await sut.ClearAllMessages(new ClearAllMessages
+            {
+                UserId = "u1",
+            });
+            actual.Should().BeTrue();
+
+            var expectedCallEndpoint = $"{ExpectedHostUrl}";
+            restServiceMock.Verify(it => it.Put(
+                It.Is<string>(actual => actual == expectedCallEndpoint),
+                It.Is<ClearAllMessages>(actual => actual.UserId == "u1")), Times.Exactly(1));
         }
 
         #endregion
