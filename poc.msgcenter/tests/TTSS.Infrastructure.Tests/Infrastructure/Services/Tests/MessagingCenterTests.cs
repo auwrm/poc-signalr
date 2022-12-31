@@ -496,10 +496,7 @@ namespace TTSS.Infrastructure.Services.Tests
         #region UpdateMessageTracker
 
         [Fact]
-        public Task UpdateMessageTracker_AllDataValid_ThenCallTheApi()
-            => validateUpdateMessageTracker();
-
-        private async Task validateUpdateMessageTracker()
+        public async Task UpdateMessageTracker_AllDataValid_ThenCallTheApi()
         {
             var req = fixture.Create<UpdateMessageTracker>();
             var result = fixture.Create<RestResponse<bool>>();
@@ -516,6 +513,30 @@ namespace TTSS.Infrastructure.Services.Tests
 
             var expectedCallEndpoint = $"{ExpectedHostUrl}u1?from=10&thru=30";
             restServiceMock.Verify(it => it.Put(It.Is<string>(actual => actual == expectedCallEndpoint)), Times.Exactly(1));
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData(" ")]
+        [InlineData("valid", -1)]
+        [InlineData("valid", 0, -1)]
+        public async Task UpdateMessageTracker_DataInvalid_ThenDoNothing(string userId, long fromMsgId = 0, long thruMsgId = 0)
+        {
+            var req = fixture.Create<UpdateMessageTracker>();
+            var result = fixture.Create<RestResponse<bool>>();
+            restServiceMock
+                .Setup(it => it.Put(It.IsAny<string>()))
+                .Returns<string>(_ => Task.CompletedTask);
+            var actual = await sut.UpdateMessageTracker(new UpdateMessageTracker
+            {
+                UserId = userId,
+                FromMessageId = fromMsgId,
+                ThruMessageId = thruMsgId,
+            });
+            actual.Should().BeFalse();
+
+            restServiceMock.Verify(it => it.Put(It.IsAny<string>()), Times.Never());
         }
 
         #endregion
