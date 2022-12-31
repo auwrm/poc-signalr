@@ -7,7 +7,6 @@ namespace TTSS.Infrastructure.Services
         Task<SendMessageResponse?> Send(SendMessage message);
         Task<SendMessageResponse?> Send(IEnumerable<SendMessage> messages);
         Task<MessagePack> SyncMessage(GetMessages request);
-        Task<MessagePack> GetNewMessages(GetMessages request);
         Task<MessagePack> GetMoreMessages(GetMessages request);
         Task<bool> UpdateMessageTracker(UpdateMessageTracker request);
         Task<bool> ClearAllMessages(ClearAllMessages request);

@@ -44,8 +44,19 @@ namespace TTSS.Infrastructure.Services
             return (rsp?.IsSuccessStatusCode ?? false) ? rsp.Data : new() { Messages = Enumerable.Empty<Message>() };
         }
 
-        public Task<MessagePack> GetNewMessages(GetMessages request) => throw new NotImplementedException();
-        public Task<MessagePack> GetMoreMessages(GetMessages request) => throw new NotImplementedException();
+        public async Task<MessagePack> GetMoreMessages(GetMessages request)
+        {
+            if (!request.Validate()) return new() { Messages = Enumerable.Empty<Message>() };
+
+            var builder = new UriBuilder(msgCenterHostUrl);
+            builder.Scheme = "https";
+            builder.Path = $"{request.UserId}/{request.FromGroup}/more/{request.FromMessageId}";
+            var scopes = $"scopes={string.Join(',', request.Filter.Scopes.Distinct())}";
+            var activities = $"activities={string.Join(',', request.Filter.Activities.Distinct())}";
+            builder.Query = $"{scopes}&{activities}";
+            var rsp = await restService.Get<MessagePack>(builder.Uri.AbsoluteUri);
+            return (rsp?.IsSuccessStatusCode ?? false) ? rsp.Data : new() { Messages = Enumerable.Empty<Message>() };
+        }
         public Task<bool> UpdateMessageTracker(UpdateMessageTracker request) => throw new NotImplementedException();
         public Task<bool> ClearAllMessages(ClearAllMessages request) => throw new NotImplementedException();
     }

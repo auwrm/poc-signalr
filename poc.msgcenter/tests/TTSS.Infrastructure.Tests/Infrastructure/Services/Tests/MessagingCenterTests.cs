@@ -54,7 +54,7 @@ namespace TTSS.Infrastructure.Services.Tests
             (await sut.Send(messages)).Should().BeEquivalentTo(result.Data);
             restServiceMock.Verify(it => it.Post<IEnumerable<SendMessage>, SendMessageResponse>(
                 It.Is<string>(actual => actual == HostUrl),
-                It.Is<IEnumerable<SendMessage>>(actual => actual == messages)), Times.Once());
+                It.Is<IEnumerable<SendMessage>>(actual => actual == messages)), Times.Exactly(1));
         }
 
         [Theory]
@@ -353,8 +353,8 @@ namespace TTSS.Infrastructure.Services.Tests
                 }
             });
             actual.Should().Be(result.Data);
-            var expectedCallEndpoint = $"https://www.msgcenter.com/u1/g1/0?scopes=s1,s2&activities=a1,a2,a3";
-            restServiceMock.Verify(it => it.Get<MessagePack>(It.Is<string>(actual => actual == expectedCallEndpoint)), Times.Once());
+            var expectedCallEndpoint = $"{HostUrl}/u1/g1/0?scopes=s1,s2&activities=a1,a2,a3";
+            restServiceMock.Verify(it => it.Get<MessagePack>(It.Is<string>(actual => actual == expectedCallEndpoint)), Times.Exactly(1));
         }
 
         [Theory]
@@ -370,10 +370,8 @@ namespace TTSS.Infrastructure.Services.Tests
             var input = fixture.Create<GetMessages>();
             input.Filter.Scopes = scopes.Split(',', StringSplitOptions.RemoveEmptyEntries);
             input.Filter.Activities = activities.Split(',', StringSplitOptions.RemoveEmptyEntries);
-            var actual = await sut.SyncMessage(input);
-
-            actual.Should().Be(result.Data);
-            restServiceMock.Verify(it => it.Get<MessagePack>(It.Is<string>(actual => actual.Contains(expectedScope) && actual.Contains(expectedActivity))), Times.Once());
+            (await sut.SyncMessage(input)).Should().Be(result.Data);
+            restServiceMock.Verify(it => it.Get<MessagePack>(It.Is<string>(actual => actual.Contains(expectedScope) && actual.Contains(expectedActivity))), Times.Exactly(1));
         }
 
         [Theory]
@@ -391,7 +389,7 @@ namespace TTSS.Infrastructure.Services.Tests
         [InlineData("valid", "valid", 0, "valid", " ")]
         [InlineData("valid", "valid", 0, "valid", null)]
         public Task SyncMessage_WithDataInvalid_ThenReceiveAnError(string userId = "valid", string group = "valid", long msgId = 0, string scope = "valid", string activity = "valid")
-            => validateInvalidInputMustNotCrashThisModule(new GetMessages
+            => validateSyncMessageWithInvalidInput_ItMustNotCrashThisModule(new GetMessages
             {
                 UserId = userId,
                 FromGroup = group,
@@ -405,11 +403,108 @@ namespace TTSS.Infrastructure.Services.Tests
 
         [Fact]
         public Task SyncMessage_WithParameterIsNull_ThenTheSystemMustNotCrash()
-            => validateInvalidInputMustNotCrashThisModule(null);
+            => validateSyncMessageWithInvalidInput_ItMustNotCrashThisModule(null);
 
-        private async Task validateInvalidInputMustNotCrashThisModule(GetMessages param)
+        private async Task validateSyncMessageWithInvalidInput_ItMustNotCrashThisModule(GetMessages param)
         {
             var actual = await sut.SyncMessage(param);
+            actual.Messages.Should().BeEmpty();
+            actual.HasMorePages.Should().BeFalse();
+            actual.LastMessageId.Should().Be(0);
+            restServiceMock.Verify(it => it.Get<MessagePack>(It.IsAny<string>()), Times.Never());
+        }
+
+        #endregion
+
+        #region GetMoreMessages
+
+        [Fact]
+        public Task GetMoreMessages_AllDataValid_ThenCallGetMore()
+            => validateCallGetMoreMessages();
+
+        [Fact]
+        public Task GetMoreMessages_WithInsecureHostScheme_ThenSystemMustCalloutWithHttps()
+        {
+            const string InsecureHostUrl = "http://www.msgcenter.com";
+            msgCenterOpt.HostUrl = InsecureHostUrl;
+            return validateCallGetMoreMessages();
+        }
+
+        private async Task validateCallGetMoreMessages()
+        {
+            var req = fixture.Create<GetMessages>();
+            var result = fixture.Create<RestResponse<MessagePack>>();
+            restServiceMock
+                .Setup(it => it.Get<MessagePack>(It.IsAny<string>()))
+                .Returns<string>(_ => Task.FromResult(result));
+            var actual = await sut.GetMoreMessages(new GetMessages
+            {
+                UserId = "u1",
+                FromGroup = "g1",
+                FromMessageId = 0,
+                Filter = new()
+                {
+                    Scopes = new[] { "s1", "s2" },
+                    Activities = new[] { "a1", "a2", "a3" },
+                }
+            });
+            actual.Should().BeEquivalentTo(result.Data);
+
+            var expectedCallEndpoint = $"{HostUrl}/u1/g1/more/0?scopes=s1,s2&activities=a1,a2,a3";
+            restServiceMock.Verify(it => it.Get<MessagePack>(It.Is<string>(actual => actual == expectedCallEndpoint)), Times.Exactly(1));
+        }
+
+        [Theory]
+        [InlineData("s1,s2,s1,s3,s2", "a0", "s1,s2,s3", "a0")]
+        [InlineData("s0", "a1,a2,a1,a3,a2", "s0", "a1,a2,a3")]
+        public async Task GetMoreMessages_WithSomeDuplicatedValue_ThenSystemMustRemoveTheDuplicatedValue(string scopes, string activities, string expectedScope, string expectedActivity)
+        {
+            var result = fixture.Create<RestResponse<MessagePack>>();
+            restServiceMock
+                .Setup(it => it.Get<MessagePack>(It.IsAny<string>()))
+                .Returns<string>(_ => Task.FromResult(result));
+
+            var input = fixture.Create<GetMessages>();
+            input.Filter.Scopes = scopes.Split(',', StringSplitOptions.RemoveEmptyEntries);
+            input.Filter.Activities = activities.Split(',', StringSplitOptions.RemoveEmptyEntries);
+            (await sut.GetMoreMessages(input)).Should().Be(result.Data);
+            restServiceMock.Verify(it => it.Get<MessagePack>(It.Is<string>(actual => actual.Contains(expectedScope) && actual.Contains(expectedActivity))), Times.Exactly(1));
+        }
+
+        [Theory]
+        [InlineData("")]
+        [InlineData(" ")]
+        [InlineData(null)]
+        [InlineData("valid", "")]
+        [InlineData("valid", " ")]
+        [InlineData("valid", null)]
+        [InlineData("valid", "valid", -1)]
+        [InlineData("valid", "valid", 0, "")]
+        [InlineData("valid", "valid", 0, " ")]
+        [InlineData("valid", "valid", 0, null)]
+        [InlineData("valid", "valid", 0, "valid", "")]
+        [InlineData("valid", "valid", 0, "valid", " ")]
+        [InlineData("valid", "valid", 0, "valid", null)]
+        public Task GetMoreMessages_WithDataInvalid_ThenReceiveAnError(string userId = "valid", string group = "valid", long msgId = 0, string scope = "valid", string activity = "valid")
+            => validateGetMoreMessagesWithInvalidInput_ItMustNotCrashThisModule(new GetMessages
+            {
+                UserId = userId,
+                FromGroup = group,
+                FromMessageId = msgId,
+                Filter = new()
+                {
+                    Scopes = new[] { scope },
+                    Activities = new[] { activity },
+                }
+            });
+
+        [Fact]
+        public Task GetMoreMessages_WithParameterIsNull_ThenTheSystemMustNotCrash()
+            => validateGetMoreMessagesWithInvalidInput_ItMustNotCrashThisModule(null);
+
+        private async Task validateGetMoreMessagesWithInvalidInput_ItMustNotCrashThisModule(GetMessages param)
+        {
+            var actual = await sut.GetMoreMessages(param);
             actual.Messages.Should().BeEmpty();
             actual.HasMorePages.Should().BeFalse();
             actual.LastMessageId.Should().Be(0);
