@@ -16,14 +16,16 @@ namespace TTSS.Infrastructure.Services.Tests
         private IMessagingCenter sut;
         private Mock<IRestService> restServiceMock;
         private MessagingCenterOptions msgCenterOpt;
-        private const string HostUrl = "https://www.msgcenter.com";
+        private const string HostFQDN = "www.msgcenter.com";
+        private string ExpectedHostUrl => $"https://{HostFQDN}/";
+
         public MessagingCenterTests(ITestOutputHelper testOutput) : base(testOutput)
         {
             fixture = new Fixture()
                 .Customize(new AutoMoqCustomization());
             restServiceMock = fixture.Freeze<Mock<IRestService>>();
             msgCenterOpt = fixture.Freeze<MessagingCenterOptions>();
-            msgCenterOpt.HostUrl = HostUrl;
+            msgCenterOpt.HostUrl = HostFQDN;
             sut = fixture.Create<MessagingCenter>();
         }
 
@@ -53,7 +55,7 @@ namespace TTSS.Infrastructure.Services.Tests
                 .Returns<string, IEnumerable<SendMessage>>((_, _) => Task.FromResult(result));
             (await sut.Send(messages)).Should().BeEquivalentTo(result.Data);
             restServiceMock.Verify(it => it.Post<IEnumerable<SendMessage>, SendMessageResponse>(
-                It.Is<string>(actual => actual == HostUrl),
+                It.Is<string>(actual => actual == ExpectedHostUrl),
                 It.Is<IEnumerable<SendMessage>>(actual => actual == messages)), Times.Exactly(1));
         }
 
@@ -65,7 +67,7 @@ namespace TTSS.Infrastructure.Services.Tests
             var rsp = await sut.Send(messages);
             rsp.ErrorMessage.Should().NotBeNullOrWhiteSpace();
             restServiceMock.Verify(it => it.Post<IEnumerable<SendMessage>, SendMessageResponse>(
-                It.Is<string>(actual => actual == HostUrl),
+                It.Is<string>(actual => actual == ExpectedHostUrl),
                 It.IsAny<IEnumerable<SendMessage>>()), Times.Never());
         }
         public class InvalidDynamicMessages : TheoryData<IEnumerable<SendMessage<DynamicContent>>>
@@ -324,18 +326,7 @@ namespace TTSS.Infrastructure.Services.Tests
         #region SyncMessage
 
         [Fact]
-        public Task SyncMessage_WithAllDataValid_ThenSystemCallSync()
-            => validateCallSyncMessage();
-
-        [Fact]
-        public Task SyncMessage_WithInsecureHostScheme_ThenSystemMustCalloutWithHttps()
-        {
-            const string InsecureHostUrl = "http://www.msgcenter.com";
-            msgCenterOpt.HostUrl = InsecureHostUrl;
-            return validateCallSyncMessage();
-        }
-
-        private async Task validateCallSyncMessage()
+        public async Task SyncMessage_WithAllDataValid_ThenSystemCallSync()
         {
             var result = fixture.Create<RestResponse<MessagePack>>();
             restServiceMock
@@ -353,7 +344,7 @@ namespace TTSS.Infrastructure.Services.Tests
                 }
             });
             actual.Should().Be(result.Data);
-            var expectedCallEndpoint = $"{HostUrl}/u1/g1/0?scopes=s1,s2&activities=a1,a2,a3";
+            var expectedCallEndpoint = $"{ExpectedHostUrl}u1/g1/0?scopes=s1,s2&activities=a1,a2,a3";
             restServiceMock.Verify(it => it.Get<MessagePack>(It.Is<string>(actual => actual == expectedCallEndpoint)), Times.Exactly(1));
         }
 
@@ -419,18 +410,7 @@ namespace TTSS.Infrastructure.Services.Tests
         #region GetMoreMessages
 
         [Fact]
-        public Task GetMoreMessages_AllDataValid_ThenCallGetMore()
-            => validateCallGetMoreMessages();
-
-        [Fact]
-        public Task GetMoreMessages_WithInsecureHostScheme_ThenSystemMustCalloutWithHttps()
-        {
-            const string InsecureHostUrl = "http://www.msgcenter.com";
-            msgCenterOpt.HostUrl = InsecureHostUrl;
-            return validateCallGetMoreMessages();
-        }
-
-        private async Task validateCallGetMoreMessages()
+        public async Task GetMoreMessages_AllDataValid_ThenCallGetMore()
         {
             var req = fixture.Create<GetMessages>();
             var result = fixture.Create<RestResponse<MessagePack>>();
@@ -450,7 +430,7 @@ namespace TTSS.Infrastructure.Services.Tests
             });
             actual.Should().BeEquivalentTo(result.Data);
 
-            var expectedCallEndpoint = $"{HostUrl}/u1/g1/more/0?scopes=s1,s2&activities=a1,a2,a3";
+            var expectedCallEndpoint = $"{ExpectedHostUrl}u1/g1/more/0?scopes=s1,s2&activities=a1,a2,a3";
             restServiceMock.Verify(it => it.Get<MessagePack>(It.Is<string>(actual => actual == expectedCallEndpoint)), Times.Exactly(1));
         }
 
@@ -509,6 +489,33 @@ namespace TTSS.Infrastructure.Services.Tests
             actual.HasMorePages.Should().BeFalse();
             actual.LastMessageId.Should().Be(0);
             restServiceMock.Verify(it => it.Get<MessagePack>(It.IsAny<string>()), Times.Never());
+        }
+
+        #endregion
+
+        #region UpdateMessageTracker
+
+        [Fact]
+        public Task UpdateMessageTracker_AllDataValid_ThenCallTheApi()
+            => validateUpdateMessageTracker();
+
+        private async Task validateUpdateMessageTracker()
+        {
+            var req = fixture.Create<UpdateMessageTracker>();
+            var result = fixture.Create<RestResponse<bool>>();
+            restServiceMock
+                .Setup(it => it.Put(It.IsAny<string>()))
+                .Returns<string>(_ => Task.CompletedTask);
+            var actual = await sut.UpdateMessageTracker(new UpdateMessageTracker
+            {
+                UserId = "u1",
+                FromMessageId = 10,
+                ThruMessageId = 30,
+            });
+            actual.Should().BeTrue();
+
+            var expectedCallEndpoint = $"{ExpectedHostUrl}u1?from=10&thru=30";
+            restServiceMock.Verify(it => it.Put(It.Is<string>(actual => actual == expectedCallEndpoint)), Times.Exactly(1));
         }
 
         #endregion

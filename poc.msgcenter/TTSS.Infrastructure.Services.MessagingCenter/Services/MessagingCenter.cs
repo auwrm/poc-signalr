@@ -7,13 +7,16 @@ namespace TTSS.Infrastructure.Services
     public class MessagingCenter : IMessagingCenter
     {
         private readonly IRestService restService;
-        private readonly string msgCenterHostUrl;
+        private readonly MessagingCenterOptions messagingCenterOptions;
+
+        private string hostUrl;
+        private string HostUrl => hostUrl ??= messagingCenterOptions?.HostUrl;
 
         public MessagingCenter(IRestService restService,
             MessagingCenterOptions msgCenterOptions)
         {
             this.restService = restService;
-            msgCenterHostUrl = msgCenterOptions?.HostUrl ?? throw new ArgumentNullException(nameof(msgCenterOptions));
+            messagingCenterOptions = msgCenterOptions;
         }
 
         public Task<SendMessageResponse?> Send(SendMessage message)
@@ -23,7 +26,12 @@ namespace TTSS.Infrastructure.Services
         {
             if (!messages.Validate()) return createError("Nonce, Filter and TargetGroup can't be null or empty.");
 
-            var rsp = await restService.Post<IEnumerable<SendMessage>, SendMessageResponse>(msgCenterHostUrl, messages);
+            var builder = new UriBuilder
+            {
+                Host = HostUrl,
+                Scheme = "https",
+            };
+            var rsp = await restService.Post<IEnumerable<SendMessage>, SendMessageResponse>(builder.Uri.AbsoluteUri, messages);
             return (rsp?.IsSuccessStatusCode ?? false) ? rsp.Data : createError("Can't send message to the Messaging Center Service", rsp?.Data?.NonceStatus);
 
             SendMessageResponse createError(string msg, IDictionary<string, bool> status = default)
@@ -34,12 +42,15 @@ namespace TTSS.Infrastructure.Services
         {
             if (!request.Validate()) return new() { Messages = Enumerable.Empty<Message>() };
 
-            var builder = new UriBuilder(msgCenterHostUrl);
-            builder.Scheme = "https";
-            builder.Path = $"{request.UserId}/{request.FromGroup}/{request.FromMessageId}";
             var scopes = $"scopes={string.Join(',', request.Filter.Scopes.Distinct())}";
             var activities = $"activities={string.Join(',', request.Filter.Activities.Distinct())}";
-            builder.Query = $"{scopes}&{activities}";
+            var builder = new UriBuilder
+            {
+                Host = HostUrl,
+                Scheme = "https",
+                Query = $"{scopes}&{activities}",
+                Path = $"{request.UserId}/{request.FromGroup}/{request.FromMessageId}",
+            };
             var rsp = await restService.Get<MessagePack>(builder.Uri.AbsoluteUri);
             return (rsp?.IsSuccessStatusCode ?? false) ? rsp.Data : new() { Messages = Enumerable.Empty<Message>() };
         }
@@ -48,16 +59,36 @@ namespace TTSS.Infrastructure.Services
         {
             if (!request.Validate()) return new() { Messages = Enumerable.Empty<Message>() };
 
-            var builder = new UriBuilder(msgCenterHostUrl);
-            builder.Scheme = "https";
-            builder.Path = $"{request.UserId}/{request.FromGroup}/more/{request.FromMessageId}";
             var scopes = $"scopes={string.Join(',', request.Filter.Scopes.Distinct())}";
             var activities = $"activities={string.Join(',', request.Filter.Activities.Distinct())}";
-            builder.Query = $"{scopes}&{activities}";
+            var builder = new UriBuilder
+            {
+                Host = HostUrl,
+                Scheme = "https",
+                Query = $"{scopes}&{activities}",
+                Path = $"{request.UserId}/{request.FromGroup}/more/{request.FromMessageId}",
+            };
             var rsp = await restService.Get<MessagePack>(builder.Uri.AbsoluteUri);
             return (rsp?.IsSuccessStatusCode ?? false) ? rsp.Data : new() { Messages = Enumerable.Empty<Message>() };
         }
-        public Task<bool> UpdateMessageTracker(UpdateMessageTracker request) => throw new NotImplementedException();
+
+        public async Task<bool> UpdateMessageTracker(UpdateMessageTracker request)
+        {
+            if (!request.Validate()) return false;
+
+            var from = $"from={request.FromMessageId}";
+            var thru = $"thru={request.ThruMessageId}";
+            var builder = new UriBuilder
+            {
+                Host = HostUrl,
+                Scheme = "https",
+                Query = $"{from}&{thru}",
+                Path = request.UserId,
+            };
+            await restService.Put(builder.Uri.AbsoluteUri);
+            return true;
+        }
+
         public Task<bool> ClearAllMessages(ClearAllMessages request) => throw new NotImplementedException();
     }
 }
