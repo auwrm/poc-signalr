@@ -3,19 +3,23 @@ using FluentAssertions;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Azure.WebJobs.Extensions.SignalRService;
 using Moq;
+using System.Linq.Expressions;
+using TTSS.Infrastructure.Data.Mongo;
 using TTSS.Infrastructure.Services;
 using TTSS.Infrastructure.Services.Models;
+using TTSS.RealTimeUpdate.Services.DbModels;
 using TTSS.RealTimeUpdate.Services.Models;
 
 namespace TTSS.RealTimeUpdate.Services.Tests
 {
     public class MessagingCenterHubTests
     {
-        private IFixture fixture;
-        private Mock<IHubClients> hubClientsMock;
-        private Mock<IGroupManager> groupManagerMock;
-        private Mock<IDateTimeService> datetimeSvcMock;
         private DateTime currentTime = DateTime.UtcNow;
+        private readonly IFixture fixture;
+        private readonly Mock<IHubClients> hubClientsMock;
+        private readonly Mock<IGroupManager> groupManagerMock;
+        private readonly Mock<IDateTimeService> datetimeSvcMock;
+        private readonly Mock<IMongoRepository<MessageInfo, string>> mongoRepoMock;
         private readonly Func<DateTime> GetCurrentTime;
 
         private IMessagingCenterHub sut => fixture.Create<MessagingCenterHub>();
@@ -26,9 +30,11 @@ namespace TTSS.RealTimeUpdate.Services.Tests
             fixture.Register<IHubClients>(() => hubClientsMock.Object);
             fixture.Register<IGroupManager>(() => groupManagerMock.Object);
             fixture.Register<IDateTimeService>(() => datetimeSvcMock.Object);
+            fixture.Register<IMongoRepository<MessageInfo, string>>(() => mongoRepoMock.Object);
             hubClientsMock = fixture.Create<Mock<IHubClients>>();
             groupManagerMock = fixture.Create<Mock<IGroupManager>>();
             datetimeSvcMock = fixture.Create<Mock<IDateTimeService>>();
+            mongoRepoMock = fixture.Create<Mock<IMongoRepository<MessageInfo, string>>>();
             GetCurrentTime = () => currentTime;
             datetimeSvcMock.Setup(it => it.UtcNow).Returns(GetCurrentTime);
         }
@@ -184,6 +190,9 @@ namespace TTSS.RealTimeUpdate.Services.Tests
             hubClientsMock
                 .Setup(it => it.Group(TargetGroup))
                 .Returns<string>(_ => clientMock.Object);
+            mongoRepoMock
+                .Setup(it => it.Get(It.IsAny<Expression<Func<MessageInfo, bool>>>(), It.IsAny<CancellationToken>()))
+                .Returns(() => Enumerable.Empty<MessageInfo>());
             var content = fixture.Create<NotificationContent>();
             var req = new SendMessage<NotificationContent>(content)
             {
@@ -201,6 +210,20 @@ namespace TTSS.RealTimeUpdate.Services.Tests
             result.NonceStatus.Should().HaveCount(1)
                 .And.Contain(new KeyValuePair<string, bool>(req.Nonce, true));
 
+            Func<MessageInfo, bool> validateInsertAsync = actual =>
+            {
+                actual.Should().NotBeNull();
+                actual.Should().BeEquivalentTo(new MessageInfo()
+                {
+                    Id = currentTime.Ticks.ToString(),
+                    Nonce = req.Nonce,
+                    TargetGroups = req.TargetGroups,
+                    CreatedDate = currentTime,
+                    Filter = req.Filter,
+                    Content = req.Content,
+                });
+                return true;
+            };
             Func<object[], bool> validateSyncCoreAsyncParam = args =>
             {
                 args.Should().HaveCount(2);
@@ -208,7 +231,14 @@ namespace TTSS.RealTimeUpdate.Services.Tests
                 args.Last().Should().BeEquivalentTo(req.Filter);
                 return true;
             };
-
+            mongoRepoMock
+                .Verify(it =>
+                    it.InsertAsync(It.Is<MessageInfo>(actual => validateInsertAsync(actual)),
+                    It.IsAny<CancellationToken>()), Times.Exactly(1));
+            mongoRepoMock
+                .Verify(it =>
+                    it.InsertAsync(It.IsAny<MessageInfo>(),
+                    It.IsAny<CancellationToken>()), Times.Exactly(1));
             hubClientsMock
                 .Verify(it => it.Group(It.Is<string>(actual => actual == TargetGroup)), Times.Exactly(1));
             clientMock

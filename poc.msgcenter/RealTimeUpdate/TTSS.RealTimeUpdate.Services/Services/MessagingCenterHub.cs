@@ -1,8 +1,10 @@
 ﻿using Microsoft.AspNetCore.SignalR;
 using Microsoft.Azure.WebJobs.Extensions.SignalRService;
+using TTSS.Infrastructure.Data.Mongo;
 using TTSS.Infrastructure.Services;
 using TTSS.Infrastructure.Services.Models;
 using TTSS.Infrastructure.Services.Validators;
+using TTSS.RealTimeUpdate.Services.DbModels;
 using TTSS.RealTimeUpdate.Services.Models;
 
 namespace TTSS.RealTimeUpdate.Services
@@ -12,14 +14,17 @@ namespace TTSS.RealTimeUpdate.Services
         private readonly IHubClients hubClients;
         private readonly IGroupManager groupManager;
         private readonly IDateTimeService dateTimeService;
+        private readonly IMongoRepository<MessageInfo, string> messageRepo;
 
         public MessagingCenterHub(IHubClients hubClients,
             IGroupManager groupManager,
-            IDateTimeService dateTimeService)
+            IDateTimeService dateTimeService,
+            IMongoRepository<MessageInfo, string> messageRepo)
         {
             this.hubClients = hubClients ?? throw new ArgumentNullException(nameof(hubClients));
             this.groupManager = groupManager ?? throw new ArgumentNullException(nameof(groupManager));
             this.dateTimeService = dateTimeService ?? throw new ArgumentNullException(nameof(dateTimeService));
+            this.messageRepo = messageRepo ?? throw new ArgumentNullException(nameof(messageRepo));
         }
 
         public async Task SendClientSecret(InvocationContext context)
@@ -61,10 +66,44 @@ namespace TTSS.RealTimeUpdate.Services
                 };
             }
 
-            // TODO: Find duplicated nonce
+            var fromTime = dateTimeService.UtcNow.Subtract(TimeSpan.FromMinutes(5));
+            var hasDone = messageRepo.Get(it => it.Nonce == message.Nonce && it.CreatedDate >= fromTime).Count() > 0;
+            if (hasDone)
+            {
+                return new()
+                {
+                    ErrorMessage = "Duplicated request.",
+                    NonceStatus = string.IsNullOrEmpty(message?.Nonce)
+                        ? new Dictionary<string, bool>()
+                        : new() { { message.Nonce, false } },
+                };
+            }
+
             var eventId = dateTimeService.UtcNow.Ticks;
-            // TODO: Create record
-            // TODO: Notify
+
+            MessageContent content = null;
+            if (message is SendMessage<DynamicContent> dynamic)
+            {
+                content = dynamic.Content;
+            }
+            else if (message is SendMessage<NotificationContent> noti)
+            {
+                content = noti.Content;
+            }
+            else
+            {
+                throw new NotSupportedException("Not support this message content");
+            }
+
+            await messageRepo.InsertAsync(new()
+            {
+                Id = eventId.ToString(),
+                CreatedDate = dateTimeService.UtcNow,
+                Filter = message.Filter,
+                Nonce = message.Nonce,
+                TargetGroups = message.TargetGroups,
+                Content = content,
+            });
 
             foreach (var group in message.TargetGroups.Distinct())
             {

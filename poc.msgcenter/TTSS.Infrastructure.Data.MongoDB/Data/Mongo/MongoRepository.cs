@@ -4,11 +4,7 @@ using TTSS.Infrastructure.Models;
 
 namespace TTSS.Infrastructure.Data.Mongo
 {
-    public class MongoRepository<T, K> : IOperationalRepository<T, K>,
-        IUpsertRepository<T, K>,
-        IQueryRepository<T, K>,
-        IDeletableRepository<T, K>,
-        IInsertBulkRepository<T>
+    public class MongoRepository<T, K> : IMongoRepository<T, K>
         where T : IDbModel<K>
     {
         protected internal readonly string CollectionName;
