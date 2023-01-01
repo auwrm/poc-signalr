@@ -6,6 +6,5 @@ namespace TTSS.RealTimeUpdate.Services.Models
     {
         public string Secret { get; set; }
         public string GroupName { get; set; }
-        public InvocationContext Context { get; set; }
     }
 }

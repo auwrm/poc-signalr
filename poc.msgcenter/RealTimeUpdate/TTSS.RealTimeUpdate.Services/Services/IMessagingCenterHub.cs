@@ -7,7 +7,7 @@ namespace TTSS.RealTimeUpdate.Services
     public interface IMessagingCenterHub : IMessagingCenter
     {
         Task SendClientSecret(InvocationContext context);
-        Task JoinGroup(JoinGroupRequest req);
+        Task<bool> JoinGroup(JoinGroupRequest req);
         Task LeaveGroup(InvocationContext context);
     }
 }
