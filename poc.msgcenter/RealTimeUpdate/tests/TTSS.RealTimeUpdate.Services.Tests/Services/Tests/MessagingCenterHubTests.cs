@@ -3,6 +3,8 @@ using FluentAssertions;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Azure.WebJobs.Extensions.SignalRService;
 using Moq;
+using TTSS.Infrastructure.Services;
+using TTSS.Infrastructure.Services.Models;
 using TTSS.RealTimeUpdate.Services.Models;
 
 namespace TTSS.RealTimeUpdate.Services.Tests
@@ -12,6 +14,10 @@ namespace TTSS.RealTimeUpdate.Services.Tests
         private IFixture fixture;
         private Mock<IHubClients> hubClientsMock;
         private Mock<IGroupManager> groupManagerMock;
+        private Mock<IDateTimeService> datetimeSvcMock;
+        private DateTime currentTime = DateTime.UtcNow;
+        private readonly Func<DateTime> GetCurrentTime;
+
         private IMessagingCenterHub sut => fixture.Create<MessagingCenterHub>();
 
         public MessagingCenterHubTests()
@@ -19,8 +25,12 @@ namespace TTSS.RealTimeUpdate.Services.Tests
             fixture = new Fixture();
             fixture.Register<IHubClients>(() => hubClientsMock.Object);
             fixture.Register<IGroupManager>(() => groupManagerMock.Object);
+            fixture.Register<IDateTimeService>(() => datetimeSvcMock.Object);
             hubClientsMock = fixture.Create<Mock<IHubClients>>();
             groupManagerMock = fixture.Create<Mock<IGroupManager>>();
+            datetimeSvcMock = fixture.Create<Mock<IDateTimeService>>();
+            GetCurrentTime = () => currentTime;
+            datetimeSvcMock.Setup(it => it.UtcNow).Returns(GetCurrentTime);
         }
 
         #region RequestOTP
@@ -146,22 +156,71 @@ namespace TTSS.RealTimeUpdate.Services.Tests
 
         private async Task validateJoinGroupWithInvalidParam(JoinGroupRequest req)
         {
+            var clientMock = fixture.Create<Mock<IClientProxy>>();
+            hubClientsMock
+                .Setup(it => it.User(It.IsAny<string>()))
+                .Returns<string>(cid => clientMock.Object);
+
+            (await sut.JoinGroup(req)).Should().BeFalse();
+
+            hubClientsMock
+                .Verify(it => it.User(It.IsAny<string>()), Times.Never());
+            groupManagerMock
+                .Verify(it => it.AddToGroupAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<string>(),
+                    It.IsAny<CancellationToken>()), Times.Never());
+        }
+
+        #endregion
+
+        #region Send
+
+        [Fact]
+        public async Task Send_AllDataValid_ThenSendMessageToTheGroup()
+        {
+            const string TargetGroup = "g1";
+            var clientMock = fixture.Create<Mock<IClientProxy>>();
+            hubClientsMock
+                .Setup(it => it.Group(TargetGroup))
+                .Returns<string>(_ => clientMock.Object);
+            var content = fixture.Create<NotificationContent>();
+            var req = new SendMessage<NotificationContent>(content)
             {
-                var clientMock = fixture.Create<Mock<IClientProxy>>();
-                hubClientsMock
-                    .Setup(it => it.User(It.IsAny<string>()))
-                    .Returns<string>(cid => clientMock.Object);
+                Nonce = Guid.NewGuid().ToString(),
+                TargetGroups = new[] { TargetGroup },
+                Filter = new()
+                {
+                    Scopes = new[] { "s1" },
+                    Activities = new[] { "a1" },
+                },
+            };
+            var result = await sut.Send(req);
+            result.Should().NotBeNull();
+            result.ErrorMessage.Should().BeNullOrWhiteSpace();
+            result.NonceStatus.Should().HaveCount(1)
+                .And.Contain(new KeyValuePair<string, bool>(req.Nonce, true));
 
-                (await sut.JoinGroup(req)).Should().BeFalse();
+            Func<object[], bool> validateSyncCoreAsyncParam = args =>
+            {
+                args.Should().HaveCount(2);
+                args.First().Should().Be(currentTime.Ticks);
+                args.Last().Should().BeEquivalentTo(req.Filter);
+                return true;
+            };
 
-                hubClientsMock
-                    .Verify(it => it.User(It.IsAny<string>()), Times.Never());
-                groupManagerMock
-                    .Verify(it => it.AddToGroupAsync(
-                        It.IsAny<string>(),
-                        It.IsAny<string>(),
-                        It.IsAny<CancellationToken>()), Times.Never());
-            }
+            hubClientsMock
+                .Verify(it => it.Group(It.Is<string>(actual => actual == TargetGroup)), Times.Exactly(1));
+            clientMock
+                .Verify(it => it.SendCoreAsync(
+                    It.Is<string>(actual => actual == "update"),
+                    It.Is<object[]>(actual => validateSyncCoreAsyncParam(actual)),
+                    It.IsAny<CancellationToken>()), Times.Exactly(1));
+            clientMock
+                .Verify(it => it.SendCoreAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<object[]>(),
+                    It.IsAny<CancellationToken>()), Times.Exactly(1));
         }
 
         #endregion
