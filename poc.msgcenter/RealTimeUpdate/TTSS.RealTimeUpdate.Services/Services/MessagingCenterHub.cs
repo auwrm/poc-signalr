@@ -55,32 +55,13 @@ namespace TTSS.RealTimeUpdate.Services
 
         public async Task<SendMessageResponse?> Send(SendMessage message)
         {
-            if (!message.Validate())
-            {
-                return new()
-                {
-                    ErrorMessage = "Nonce, Filter and TargetGroup can't be null or empty.",
-                    NonceStatus = string.IsNullOrEmpty(message?.Nonce)
-                        ? new Dictionary<string, bool>()
-                        : new() { { message.Nonce, false } },
-                };
-            }
+            if (!message.Validate()) return createError("Nonce, Filter and TargetGroup can't be null or empty.");
 
             var fromTime = dateTimeService.UtcNow.Subtract(TimeSpan.FromMinutes(5));
             var hasDone = messageRepo.Get(it => it.Nonce == message.Nonce && it.CreatedDate >= fromTime).Count() > 0;
-            if (hasDone)
-            {
-                return new()
-                {
-                    ErrorMessage = "Duplicated request.",
-                    NonceStatus = string.IsNullOrEmpty(message?.Nonce)
-                        ? new Dictionary<string, bool>()
-                        : new() { { message.Nonce, false } },
-                };
-            }
+            if (hasDone) return createError("Duplicated request.");
 
-            var eventId = dateTimeService.UtcNow.Ticks;
-
+            // TODO: Simplify the DB model
             MessageContent content = null;
             if (message is SendMessage<DynamicContent> dynamic)
             {
@@ -95,14 +76,16 @@ namespace TTSS.RealTimeUpdate.Services
                 throw new NotSupportedException("Not support this message content");
             }
 
+            // TODO: Simplify the DB model
+            var eventId = dateTimeService.UtcNow.Ticks;
             await messageRepo.InsertAsync(new()
             {
                 Id = eventId.ToString(),
+                Content = content,
+                Nonce = message.Nonce,
                 CreatedDate = dateTimeService.UtcNow,
                 Filter = message.Filter,
-                Nonce = message.Nonce,
                 TargetGroups = message.TargetGroups,
-                Content = content,
             });
 
             foreach (var group in message.TargetGroups.Distinct())
@@ -114,14 +97,63 @@ namespace TTSS.RealTimeUpdate.Services
 
             return new()
             {
-                NonceStatus = new Dictionary<string, bool>()
+                NonceStatus = new Dictionary<string, bool>
                 {
                     { message.Nonce, true }
                 }
             };
+
+            SendMessageResponse createError(string error)
+                => new()
+                {
+                    ErrorMessage = error,
+                    NonceStatus = string.IsNullOrEmpty(message?.Nonce)
+                        ? new Dictionary<string, bool>()
+                        : new() { { message.Nonce, false } },
+                };
         }
 
-        public Task<SendMessageResponse?> Send(IEnumerable<SendMessage> messages) => throw new NotImplementedException();
+        public async Task<SendMessageResponse?> Send(IEnumerable<SendMessage> messages)
+        {
+            if (!messages.Validate()) return createError("Nonce, Filter and TargetGroup can't be null or empty.");
+
+            var errorMsg = string.Empty;
+            var dic = Enumerable.Empty<KeyValuePair<string, bool>>();
+            foreach (var message in messages)
+            {
+                var rsp = await Send(message);
+                if (null == rsp)
+                {
+                    dic = dic.Union(new[] { new KeyValuePair<string, bool>(message.Nonce, false) });
+                }
+                else
+                {
+                    if (!string.IsNullOrWhiteSpace(rsp.ErrorMessage))
+                    {
+                        errorMsg = rsp.ErrorMessage;
+                    }
+                    dic = dic.Union(rsp.NonceStatus);
+                }
+            }
+
+            return new()
+            {
+                ErrorMessage = errorMsg,
+                NonceStatus = dic.ToDictionary(it => it.Key, it => it.Value),
+            };
+
+            SendMessageResponse createError(string error)
+                => new()
+                {
+                    ErrorMessage = error,
+                    NonceStatus = messages?
+                        .Where(it => !string.IsNullOrWhiteSpace(it?.Nonce))
+                        .Select(it => it.Nonce)
+                        .ToDictionary(it => it, _ => false)
+                        ?? new(),
+                };
+        }
+
         Task<Infrastructure.Services.Models.MessagePack> IMessagingCenter.SyncMessage(GetMessages request) => throw new NotImplementedException();
         Task<Infrastructure.Services.Models.MessagePack> IMessagingCenter.GetMoreMessages(GetMessages request) => throw new NotImplementedException();
         public Task<bool> UpdateMessageTracker(UpdateMessageTracker request) => throw new NotImplementedException();

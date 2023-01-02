@@ -1,4 +1,5 @@
 ﻿using AutoFixture;
+using AutoFixture.Xunit2;
 using FluentAssertions;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Azure.WebJobs.Extensions.SignalRService;
@@ -182,75 +183,449 @@ namespace TTSS.RealTimeUpdate.Services.Tests
 
         #region Send
 
-        [Fact]
-        public async Task Send_AllDataValid_ThenSendMessageToTheGroup()
+        [Theory, AutoData]
+        public Task Send_NotificationContent_AllDataValid_ThenSendMessageToTheGroup(SendMessage<NotificationContent> message)
+            => validateSendMessages_AllDataValid_ThenTheMessageMustBeSend(new[] { message });
+
+        [Theory, AutoData]
+        public Task Send_DynamicContent_AllDataValid_ThenSendTheMessageToTheGroup(SendMessage<DynamicContent> message)
+            => validateSendMessages_AllDataValid_ThenTheMessageMustBeSend(new[] { message });
+
+        [Theory, AutoData]
+        public Task Send_NotificationContents_AllDataValid_ThenSendMessagesToTheGroup(IEnumerable<SendMessage<NotificationContent>> messages)
+            => validateSendMessages_AllDataValid_ThenTheMessageMustBeSend(messages);
+
+        [Theory, AutoData]
+        public Task Send_DynamicContents_AllDataValid_ThenSendTheMessagesToTheGroup(IEnumerable<SendMessage<DynamicContent>> messages)
+            => validateSendMessages_AllDataValid_ThenTheMessageMustBeSend(messages);
+
+        private async Task validateSendMessages_AllDataValid_ThenTheMessageMustBeSend<T>(IEnumerable<SendMessage<T>> messages)
+            where T : MessageContent
         {
-            const string TargetGroup = "g1";
             var clientMock = fixture.Create<Mock<IClientProxy>>();
             hubClientsMock
-                .Setup(it => it.Group(TargetGroup))
+                .Setup(it => it.Group(It.IsAny<string>()))
                 .Returns<string>(_ => clientMock.Object);
             mongoRepoMock
                 .Setup(it => it.Get(It.IsAny<Expression<Func<MessageInfo, bool>>>(), It.IsAny<CancellationToken>()))
                 .Returns(() => Enumerable.Empty<MessageInfo>());
-            var content = fixture.Create<NotificationContent>();
-            var req = new SendMessage<NotificationContent>(content)
-            {
-                Nonce = Guid.NewGuid().ToString(),
-                TargetGroups = new[] { TargetGroup },
-                Filter = new()
-                {
-                    Scopes = new[] { "s1" },
-                    Activities = new[] { "a1" },
-                },
-            };
-            var result = await sut.Send(req);
+            var result = await sut.Send(messages);
             result.Should().NotBeNull();
             result.ErrorMessage.Should().BeNullOrWhiteSpace();
-            result.NonceStatus.Should().HaveCount(1)
-                .And.Contain(new KeyValuePair<string, bool>(req.Nonce, true));
+            result.NonceStatus.Should().BeEquivalentTo(
+                messages.Select(it => it.Nonce)
+                .ToDictionary(it => it, _ => true));
 
             Func<MessageInfo, bool> validateInsertAsync = actual =>
             {
                 actual.Should().NotBeNull();
-                actual.Should().BeEquivalentTo(new MessageInfo()
-                {
-                    Id = currentTime.Ticks.ToString(),
-                    Nonce = req.Nonce,
-                    TargetGroups = req.TargetGroups,
-                    CreatedDate = currentTime,
-                    Filter = req.Filter,
-                    Content = req.Content,
-                });
-                return true;
+                return messages.Any(it =>
+                    it.Nonce == actual.Nonce
+                    && it.TargetGroups == actual.TargetGroups
+                    && it.Filter == actual.Filter
+                    && it.Content == actual.Content);
             };
             Func<object[], bool> validateSyncCoreAsyncParam = args =>
             {
                 args.Should().HaveCount(2);
                 args.First().Should().Be(currentTime.Ticks);
-                args.Last().Should().BeEquivalentTo(req.Filter);
-                return true;
+                return messages.Any(it => it.Filter == args.Last());
             };
+
+            mongoRepoMock
+               .Verify(it => it.Get(
+                   It.IsAny<Expression<Func<MessageInfo, bool>>>(),
+                   It.IsAny<CancellationToken>()), Times.Exactly(messages.Count()));
             mongoRepoMock
                 .Verify(it =>
                     it.InsertAsync(It.Is<MessageInfo>(actual => validateInsertAsync(actual)),
-                    It.IsAny<CancellationToken>()), Times.Exactly(1));
+                    It.IsAny<CancellationToken>()), Times.Exactly(messages.Count()));
             mongoRepoMock
                 .Verify(it =>
                     it.InsertAsync(It.IsAny<MessageInfo>(),
-                    It.IsAny<CancellationToken>()), Times.Exactly(1));
+                    It.IsAny<CancellationToken>()), Times.Exactly(messages.Count()));
+            var targetGroupQry = messages.SelectMany(it => it.TargetGroups).Distinct();
+            var expectedTotalSendToGroups = targetGroupQry.Count();
             hubClientsMock
-                .Verify(it => it.Group(It.Is<string>(actual => actual == TargetGroup)), Times.Exactly(1));
+                   .Verify(it => it.Group(It.Is<string>(actual => targetGroupQry.Contains(actual))), Times.Exactly(expectedTotalSendToGroups));
             clientMock
                 .Verify(it => it.SendCoreAsync(
                     It.Is<string>(actual => actual == "update"),
                     It.Is<object[]>(actual => validateSyncCoreAsyncParam(actual)),
-                    It.IsAny<CancellationToken>()), Times.Exactly(1));
+                    It.IsAny<CancellationToken>()), Times.Exactly(expectedTotalSendToGroups));
             clientMock
                 .Verify(it => it.SendCoreAsync(
                     It.IsAny<string>(),
                     It.IsAny<object[]>(),
+                    It.IsAny<CancellationToken>()), Times.Exactly(expectedTotalSendToGroups));
+        }
+
+        [Theory, AutoData]
+        public Task Send_NotificationContent_AllDataValid_ButGroupNotFound_ThenTheMessageMustNotBeSend(SendMessage<NotificationContent> message)
+            => validateSendMessages_AllDataValid_ButGroupNotFound_ThenTheMessageMustNotBeSend(new[] { message });
+
+        [Theory, AutoData]
+        public Task Send_DynamicContent_AllDataValid_ButGroupNotFound_ThenTheMessageMustNotBeSend(SendMessage<DynamicContent> message)
+            => validateSendMessages_AllDataValid_ButGroupNotFound_ThenTheMessageMustNotBeSend(new[] { message });
+
+        [Theory, AutoData]
+        public Task Send_NotificationContents_AllDataValid_ButGroupNotFound_ThenTheMessageMustNotBeSend(IEnumerable<SendMessage<NotificationContent>> messages)
+            => validateSendMessages_AllDataValid_ButGroupNotFound_ThenTheMessageMustNotBeSend(messages);
+
+        [Theory, AutoData]
+        public Task Send_DynamicContents_AllDataValid_ButGroupNotFound_ThenTheMessageMustNotBeSend(IEnumerable<SendMessage<DynamicContent>> messages)
+            => validateSendMessages_AllDataValid_ButGroupNotFound_ThenTheMessageMustNotBeSend(messages);
+
+        private async Task validateSendMessages_AllDataValid_ButGroupNotFound_ThenTheMessageMustNotBeSend<T>(IEnumerable<SendMessage<T>> messages)
+            where T : MessageContent
+        {
+            hubClientsMock
+                .Setup(it => it.Group(It.IsAny<string>()))
+                .Returns<string>(_ => null);
+            mongoRepoMock
+                .Setup(it => it.Get(It.IsAny<Expression<Func<MessageInfo, bool>>>(), It.IsAny<CancellationToken>()))
+                .Returns(() => Enumerable.Empty<MessageInfo>());
+            var result = await sut.Send(messages);
+            result.Should().NotBeNull();
+            result.ErrorMessage.Should().BeNullOrWhiteSpace();
+            result.NonceStatus.Should().BeEquivalentTo(
+                messages.Select(it => it.Nonce)
+                .ToDictionary(it => it, _ => true));
+
+            Func<MessageInfo, bool> validateInsertAsync = actual =>
+            {
+                actual.Should().NotBeNull();
+                return messages.Any(it =>
+                    it.Nonce == actual.Nonce
+                    && it.TargetGroups == actual.TargetGroups
+                    && it.Filter == actual.Filter
+                    && it.Content == actual.Content);
+            };
+            mongoRepoMock
+               .Verify(it => it.Get(
+                   It.IsAny<Expression<Func<MessageInfo, bool>>>(),
+                   It.IsAny<CancellationToken>()), Times.Exactly(messages.Count()));
+            mongoRepoMock
+                .Verify(it =>
+                    it.InsertAsync(It.Is<MessageInfo>(actual => validateInsertAsync(actual)),
+                    It.IsAny<CancellationToken>()), Times.Exactly(messages.Count()));
+            mongoRepoMock
+                .Verify(it =>
+                    it.InsertAsync(It.IsAny<MessageInfo>(),
+                    It.IsAny<CancellationToken>()), Times.Exactly(messages.Count()));
+            var targetGroupQry = messages.SelectMany(it => it.TargetGroups).Distinct();
+            var expectedTotalSendToGroups = targetGroupQry.Count();
+            hubClientsMock
+                   .Verify(it => it.Group(It.Is<string>(actual => targetGroupQry.Contains(actual))), Times.Exactly(expectedTotalSendToGroups));
+        }
+
+        [Theory]
+        [ClassData(typeof(InvalidDynamicMessages))]
+        [ClassData(typeof(InvalidNotificationMessages))]
+        public async Task Send_InvalidMessages_ThenThoseMessagesMustNotBeSend(IEnumerable<SendMessage> messages)
+        {
+            var clientMock = fixture.Create<Mock<IClientProxy>>();
+            hubClientsMock
+                .Setup(it => it.Group(It.IsAny<string>()))
+                .Returns<string>(_ => clientMock.Object);
+            mongoRepoMock
+                .Setup(it => it.Get(It.IsAny<Expression<Func<MessageInfo, bool>>>(), It.IsAny<CancellationToken>()))
+                .Returns(() => Enumerable.Empty<MessageInfo>());
+            var result = await sut.Send(messages);
+            result.Should().NotBeNull();
+            result.ErrorMessage.Should().NotBeNullOrWhiteSpace();
+            var expectedNonceStatus = messages?
+                .Where(it => !string.IsNullOrWhiteSpace(it?.Nonce))
+                .Select(it => it.Nonce)
+                .ToDictionary(it => it, _ => false) ?? new();
+            result.NonceStatus.Should().BeEquivalentTo(expectedNonceStatus);
+
+            mongoRepoMock
+                .Verify(it => it.Get(
+                    It.IsAny<Expression<Func<MessageInfo, bool>>>(),
+                    It.IsAny<CancellationToken>()), Times.Never());
+            mongoRepoMock
+                .Verify(it =>
+                    it.InsertAsync(It.IsAny<MessageInfo>(),
+                    It.IsAny<CancellationToken>()), Times.Never());
+            hubClientsMock
+                   .Verify(it => it.Group(It.IsAny<string>()), Times.Never());
+            clientMock
+                .Verify(it => it.SendCoreAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<object[]>(),
+                    It.IsAny<CancellationToken>()), Times.Never());
+        }
+        public class InvalidDynamicMessages : TheoryData<IEnumerable<SendMessage<DynamicContent>>>
+        {
+            private Fixture fixture;
+
+            public InvalidDynamicMessages()
+            {
+                fixture = new Fixture();
+                Send_DynamicContent_With_NonceIsNull();
+                Send_DynamicContent_With_NonceIsEmpty();
+                Send_DynamicContent_With_FilterIsNull();
+                Send_DynamicContent_With_FilterActivitiesAreNull();
+                Send_DynamicContent_With_FilterActivitiesAreEmpty();
+                Send_DynamicContent_With_FilterScopesAreNull();
+                Send_DynamicContent_With_FilterScopesAreEmpty();
+                Send_DynamicContent_With_TargetGroupsAreNull();
+                Send_DynamicContent_With_TargetGroupsAreEmpty();
+                Send_DynamicContents_With_Null();
+                Send_DynamicContents_With_EmptyList();
+                Send_DynamicContent_With_SomeRecordsAreNull();
+                Send_DynamicContent_With_DataIsNull();
+            }
+            void Send_DynamicContent_With_NonceIsNull()
+            {
+                var msg = fixture.Create<SendMessage<DynamicContent>>();
+                msg.Nonce = null;
+                Add(new[] { msg });
+            }
+            void Send_DynamicContent_With_NonceIsEmpty()
+            {
+                var msg = fixture.Create<SendMessage<DynamicContent>>();
+                msg.Nonce = string.Empty;
+                Add(new[] { msg });
+            }
+            void Send_DynamicContent_With_FilterIsNull()
+            {
+                var msg = fixture.Create<SendMessage<DynamicContent>>();
+                msg.Filter = null;
+                Add(new[] { msg });
+            }
+            void Send_DynamicContent_With_FilterActivitiesAreNull()
+            {
+                var msg = fixture.Create<SendMessage<DynamicContent>>();
+                msg.Filter.Activities = null;
+                Add(new[] { msg });
+            }
+            void Send_DynamicContent_With_FilterActivitiesAreEmpty()
+            {
+                var msg = fixture.Create<SendMessage<DynamicContent>>();
+                msg.Filter.Activities = Enumerable.Empty<string>();
+                Add(new[] { msg });
+            }
+            void Send_DynamicContent_With_FilterScopesAreNull()
+            {
+                var msg = fixture.Create<SendMessage<DynamicContent>>();
+                msg.Filter.Scopes = null;
+                Add(new[] { msg });
+            }
+            void Send_DynamicContent_With_FilterScopesAreEmpty()
+            {
+                var msg = fixture.Create<SendMessage<DynamicContent>>();
+                msg.Filter.Scopes = Enumerable.Empty<string>();
+                Add(new[] { msg });
+            }
+            void Send_DynamicContent_With_TargetGroupsAreNull()
+            {
+                var msg = fixture.Create<SendMessage<DynamicContent>>();
+                msg.TargetGroups = null;
+                Add(new[] { msg });
+            }
+            void Send_DynamicContent_With_TargetGroupsAreEmpty()
+            {
+                var msg = fixture.Create<SendMessage<DynamicContent>>();
+                msg.TargetGroups = Enumerable.Empty<string>();
+                Add(new[] { msg });
+            }
+            void Send_DynamicContents_With_Null()
+            {
+                Add(null);
+            }
+            void Send_DynamicContents_With_EmptyList()
+            {
+                Add(Enumerable.Empty<SendMessage<DynamicContent>>());
+            }
+            void Send_DynamicContent_With_SomeRecordsAreNull()
+            {
+                var msg = fixture.Create<SendMessage<DynamicContent>>();
+                msg.TargetGroups = Enumerable.Empty<string>();
+                Add(new[] { msg, null });
+            }
+            void Send_DynamicContent_With_DataIsNull()
+            {
+                var msg = fixture.Create<SendMessage<DynamicContent>>();
+                msg.Content.Data = null;
+                Add(new[] { msg });
+            }
+        }
+        public class InvalidNotificationMessages : TheoryData<IEnumerable<SendMessage<NotificationContent>>>
+        {
+            private Fixture fixture;
+
+            public InvalidNotificationMessages()
+            {
+                fixture = new Fixture();
+                Send_NotificationContent_With_NonceIsNull();
+                Send_NotificationContent_With_NonceIsEmpty();
+                Send_NotificationContent_With_FilterIsNull();
+                Send_NotificationContent_With_FilterActivitiesAreNull();
+                Send_NotificationContent_With_FilterActivitiesAreEmpty();
+                Send_NotificationContent_With_FilterScopesAreNull();
+                Send_NotificationContent_With_FilterScopesAreEmpty();
+                Send_NotificationContent_With_TargetGroupsAreNull();
+                Send_NotificationContent_With_TargetGroupsAreEmpty();
+                Send_NotificationContents_With_Null();
+                Send_NotificationContents_With_EmptyList();
+                Send_NotificationContent_With_SomeRecordsAreNull();
+                Send_NotificationContent_With_MessageIsNull();
+                Send_NotificationContent_With_MessageIsEmpty();
+                Send_NotificationContent_With_MessageIsWhitespace();
+                Send_NotificationContent_With_EndpointUrlIsNull();
+                Send_NotificationContent_With_EndpointUrlIsEmpty();
+                Send_NotificationContent_With_EndpointUrlIsWhitespace();
+            }
+            void Send_NotificationContent_With_NonceIsNull()
+            {
+                var msg = fixture.Create<SendMessage<NotificationContent>>();
+                msg.Nonce = null;
+                Add(new[] { msg });
+            }
+            void Send_NotificationContent_With_NonceIsEmpty()
+            {
+                var msg = fixture.Create<SendMessage<NotificationContent>>();
+                msg.Nonce = string.Empty;
+                Add(new[] { msg });
+            }
+            void Send_NotificationContent_With_FilterIsNull()
+            {
+                var msg = fixture.Create<SendMessage<NotificationContent>>();
+                msg.Filter = null;
+                Add(new[] { msg });
+            }
+            void Send_NotificationContent_With_FilterActivitiesAreNull()
+            {
+                var msg = fixture.Create<SendMessage<NotificationContent>>();
+                msg.Filter.Activities = null;
+                Add(new[] { msg });
+            }
+            void Send_NotificationContent_With_FilterActivitiesAreEmpty()
+            {
+                var msg = fixture.Create<SendMessage<NotificationContent>>();
+                msg.Filter.Activities = Enumerable.Empty<string>();
+                Add(new[] { msg });
+            }
+            void Send_NotificationContent_With_FilterScopesAreNull()
+            {
+                var msg = fixture.Create<SendMessage<NotificationContent>>();
+                msg.Filter.Scopes = null;
+                Add(new[] { msg });
+            }
+            void Send_NotificationContent_With_FilterScopesAreEmpty()
+            {
+                var msg = fixture.Create<SendMessage<NotificationContent>>();
+                msg.Filter.Scopes = Enumerable.Empty<string>();
+                Add(new[] { msg });
+            }
+            void Send_NotificationContent_With_TargetGroupsAreNull()
+            {
+                var msg = fixture.Create<SendMessage<NotificationContent>>();
+                msg.TargetGroups = null;
+                Add(new[] { msg });
+            }
+            void Send_NotificationContent_With_TargetGroupsAreEmpty()
+            {
+                var msg = fixture.Create<SendMessage<NotificationContent>>();
+                msg.TargetGroups = Enumerable.Empty<string>();
+                Add(new[] { msg });
+            }
+            void Send_NotificationContents_With_Null()
+            {
+                Add(null);
+            }
+            void Send_NotificationContents_With_EmptyList()
+            {
+                Add(Enumerable.Empty<SendMessage<NotificationContent>>());
+            }
+            void Send_NotificationContent_With_SomeRecordsAreNull()
+            {
+                var msg = fixture.Create<SendMessage<NotificationContent>>();
+                msg.TargetGroups = Enumerable.Empty<string>();
+                Add(new[] { msg, null });
+            }
+            void Send_NotificationContent_With_MessageIsNull()
+            {
+                var msg = fixture.Create<SendMessage<NotificationContent>>();
+                msg.Content.EndpointUrl = null;
+                Add(new[] { msg });
+            }
+            void Send_NotificationContent_With_MessageIsEmpty()
+            {
+                var msg = fixture.Create<SendMessage<NotificationContent>>();
+                msg.Content.EndpointUrl = null;
+                Add(new[] { msg });
+            }
+            void Send_NotificationContent_With_MessageIsWhitespace()
+            {
+                var msg = fixture.Create<SendMessage<NotificationContent>>();
+                msg.Content.EndpointUrl = " ";
+                Add(new[] { msg });
+            }
+            void Send_NotificationContent_With_EndpointUrlIsNull()
+            {
+                var msg = fixture.Create<SendMessage<NotificationContent>>();
+                msg.Content.EndpointUrl = null;
+                Add(new[] { msg });
+            }
+            void Send_NotificationContent_With_EndpointUrlIsEmpty()
+            {
+                var msg = fixture.Create<SendMessage<NotificationContent>>();
+                msg.Content.EndpointUrl = null;
+                Add(new[] { msg });
+            }
+            void Send_NotificationContent_With_EndpointUrlIsWhitespace()
+            {
+                var msg = fixture.Create<SendMessage<NotificationContent>>();
+                msg.Content.EndpointUrl = " ";
+                Add(new[] { msg });
+            }
+        }
+
+        [Theory, AutoData]
+        public async Task Send_DynamicContent_WithDuplicatedNonce_ThenSendErrorBackToTheCaller(SendMessage<DynamicContent> message)
+            => await validateDuplicatedNonce(new[] { message });
+
+        [Theory, AutoData]
+        public async Task Send_NotificationContent_WithDuplicatedNonce_ThenSendErrorBackToTheCaller(SendMessage<NotificationContent> message)
+            => await validateDuplicatedNonce(new[] { message });
+
+        public async Task validateDuplicatedNonce(IEnumerable<SendMessage> messages)
+        {
+            fixture.Register<MessageContent>(() => fixture.Create<NotificationContent>());
+            var clientMock = fixture.Create<Mock<IClientProxy>>();
+            hubClientsMock
+                .Setup(it => it.Group(It.IsAny<string>()))
+                .Returns<string>(_ => clientMock.Object);
+            mongoRepoMock
+                .Setup(it => it.Get(It.IsAny<Expression<Func<MessageInfo, bool>>>(), It.IsAny<CancellationToken>()))
+                .Returns(() => fixture.Create<IEnumerable<MessageInfo>>());
+            var result = await sut.Send(messages);
+            result.Should().NotBeNull();
+            result.ErrorMessage.Should().NotBeNullOrWhiteSpace();
+            var expectedNonceStatus = messages?
+                .Where(it => !string.IsNullOrWhiteSpace(it?.Nonce))
+                .Select(it => it.Nonce)
+                .ToDictionary(it => it, _ => false) ?? new();
+            result.NonceStatus.Should().BeEquivalentTo(expectedNonceStatus);
+
+            mongoRepoMock
+                .Verify(it => it.Get(
+                    It.IsAny<Expression<Func<MessageInfo, bool>>>(),
                     It.IsAny<CancellationToken>()), Times.Exactly(1));
+            mongoRepoMock
+                .Verify(it =>
+                    it.InsertAsync(It.IsAny<MessageInfo>(),
+                    It.IsAny<CancellationToken>()), Times.Never());
+            hubClientsMock
+                   .Verify(it => it.Group(It.IsAny<string>()), Times.Never());
+            clientMock
+                .Verify(it => it.SendCoreAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<object[]>(),
+                    It.IsAny<CancellationToken>()), Times.Never());
         }
 
         #endregion
