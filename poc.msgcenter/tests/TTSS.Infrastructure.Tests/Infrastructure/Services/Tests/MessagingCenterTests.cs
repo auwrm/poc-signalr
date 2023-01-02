@@ -351,6 +351,7 @@ namespace TTSS.Infrastructure.Services.Tests
         [Theory]
         [InlineData("s1,s2,s1,s3,s2", "a0", "s1,s2,s3", "a0")]
         [InlineData("s0", "a1,a2,a1,a3,a2", "s0", "a1,a2,a3")]
+        [InlineData("s1,s2,s1,s3,s2", "a1,a2,a1,a3,a2", "s1,s2,s3", "a1,a2,a3")]
         public async Task SyncMessage_WithSomeDuplicatedValue_ThenSystemMustRemoveTheDuplicatedValue(string scopes, string activities, string expectedScope, string expectedActivity)
         {
             var result = fixture.Create<RestResponse<MessagePack>>();
@@ -547,7 +548,7 @@ namespace TTSS.Infrastructure.Services.Tests
         {
             var result = fixture.Create<RestResponse<bool>>();
             restServiceMock
-                .Setup(it => it.Post(It.IsAny<string>(),It.IsAny<ClearAllMessages>()))
+                .Setup(it => it.Post(It.IsAny<string>(), It.IsAny<ClearAllMessages>()))
                 .Returns<string>(_ => Task.CompletedTask);
             var actual = await sut.ClearAllMessages(new ClearAllMessages
             {

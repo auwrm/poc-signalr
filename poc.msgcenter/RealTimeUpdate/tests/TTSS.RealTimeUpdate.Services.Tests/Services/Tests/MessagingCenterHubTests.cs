@@ -216,29 +216,13 @@ namespace TTSS.RealTimeUpdate.Services.Tests
                 messages.Select(it => it.Nonce)
                 .ToDictionary(it => it, _ => true));
 
-            Func<MessageInfo, bool> validateInsertAsync = actual =>
-            {
-                actual.Should().NotBeNull();
-                return messages.Any(it =>
-                    it.Nonce == actual.Nonce
-                    && it.TargetGroups == actual.TargetGroups
-                    && it.Filter == actual.Filter
-                    && it.Content == actual.Content);
-            };
-            Func<object[], bool> validateSyncCoreAsyncParam = args =>
-            {
-                args.Should().HaveCount(2);
-                args.First().Should().Be(currentTime.Ticks);
-                return messages.Any(it => it.Filter == args.Last());
-            };
-
             mongoRepoMock
                .Verify(it => it.Get(
                    It.IsAny<Expression<Func<MessageInfo, bool>>>(),
                    It.IsAny<CancellationToken>()), Times.Exactly(messages.Count()));
             mongoRepoMock
                 .Verify(it =>
-                    it.InsertAsync(It.Is<MessageInfo>(actual => validateInsertAsync(actual)),
+                    it.InsertAsync(It.Is<MessageInfo>(actual => validateInsertAsync(actual, messages)),
                     It.IsAny<CancellationToken>()), Times.Exactly(messages.Count()));
             mongoRepoMock
                 .Verify(it =>
@@ -251,13 +235,53 @@ namespace TTSS.RealTimeUpdate.Services.Tests
             clientMock
                 .Verify(it => it.SendCoreAsync(
                     It.Is<string>(actual => actual == "update"),
-                    It.Is<object[]>(actual => validateSyncCoreAsyncParam(actual)),
+                    It.Is<object[]>(actual => validateSyncCoreAsyncParam(actual, messages, currentTime.Ticks)),
                     It.IsAny<CancellationToken>()), Times.Exactly(expectedTotalSendToGroups));
             clientMock
                 .Verify(it => it.SendCoreAsync(
                     It.IsAny<string>(),
                     It.IsAny<object[]>(),
                     It.IsAny<CancellationToken>()), Times.Exactly(expectedTotalSendToGroups));
+        }
+
+        [Theory]
+        [InlineData("g1,g2,g1,g3", "s1", "a1")]
+        [InlineData("g1", "s1,s2,s1,s3", "a1")]
+        [InlineData("g1", "s1", "a1,a2,a1,a3")]
+        [InlineData("g1,g2,g1,g3", "s1,s2,s1,s3", "a1")]
+        [InlineData("g1,g2,g1,g3", "s1", "a1,a2,a1,a3")]
+        [InlineData("g1", "s1,s2,s1,s3", "a1,a2,a1,a3")]
+        [InlineData("g1,g2,g1,g3", "s1,s2,s1,s3", "a1,a2,a1,a3")]
+        public async Task Send_NotificationContents_WithDuplicatedValue_ThenSystemMustRemoveTheDuplicatedValue(string groups, string scopes, string activities)
+        {
+            var message = fixture.Create<SendMessage<NotificationContent>>();
+            message.TargetGroups = groups.Split(',', StringSplitOptions.RemoveEmptyEntries);
+            message.Filter = new()
+            {
+                Scopes = scopes.Split(',', StringSplitOptions.RemoveEmptyEntries),
+                Activities = activities.Split(',', StringSplitOptions.RemoveEmptyEntries),
+            };
+            await validateSendMessages_AllDataValid_ThenTheMessageMustBeSend(new[] { message });
+        }
+
+        [Theory]
+        [InlineData("g1,g2,g1,g3", "s1", "a1")]
+        [InlineData("g1", "s1,s2,s1,s3", "a1")]
+        [InlineData("g1", "s1", "a1,a2,a1,a3")]
+        [InlineData("g1,g2,g1,g3", "s1,s2,s1,s3", "a1")]
+        [InlineData("g1,g2,g1,g3", "s1", "a1,a2,a1,a3")]
+        [InlineData("g1", "s1,s2,s1,s3", "a1,a2,a1,a3")]
+        [InlineData("g1,g2,g1,g3", "s1,s2,s1,s3", "a1,a2,a1,a3")]
+        public async Task Send_DynamicContents_WithDuplicatedValue_ThenSystemMustRemoveTheDuplicatedValue(string groups, string scopes, string activities)
+        {
+            var message = fixture.Create<SendMessage<DynamicContent>>();
+            message.TargetGroups = groups.Split(',', StringSplitOptions.RemoveEmptyEntries);
+            message.Filter = new()
+            {
+                Scopes = scopes.Split(',', StringSplitOptions.RemoveEmptyEntries),
+                Activities = activities.Split(',', StringSplitOptions.RemoveEmptyEntries),
+            };
+            await validateSendMessages_AllDataValid_ThenTheMessageMustBeSend(new[] { message });
         }
 
         [Theory, AutoData]
@@ -292,22 +316,13 @@ namespace TTSS.RealTimeUpdate.Services.Tests
                 messages.Select(it => it.Nonce)
                 .ToDictionary(it => it, _ => true));
 
-            Func<MessageInfo, bool> validateInsertAsync = actual =>
-            {
-                actual.Should().NotBeNull();
-                return messages.Any(it =>
-                    it.Nonce == actual.Nonce
-                    && it.TargetGroups == actual.TargetGroups
-                    && it.Filter == actual.Filter
-                    && it.Content == actual.Content);
-            };
             mongoRepoMock
                .Verify(it => it.Get(
                    It.IsAny<Expression<Func<MessageInfo, bool>>>(),
                    It.IsAny<CancellationToken>()), Times.Exactly(messages.Count()));
             mongoRepoMock
                 .Verify(it =>
-                    it.InsertAsync(It.Is<MessageInfo>(actual => validateInsertAsync(actual)),
+                    it.InsertAsync(It.Is<MessageInfo>(actual => validateInsertAsync(actual, messages)),
                     It.IsAny<CancellationToken>()), Times.Exactly(messages.Count()));
             mongoRepoMock
                 .Verify(it =>
@@ -592,7 +607,7 @@ namespace TTSS.RealTimeUpdate.Services.Tests
         public async Task Send_NotificationContent_WithDuplicatedNonce_ThenSendErrorBackToTheCaller(SendMessage<NotificationContent> message)
             => await validateDuplicatedNonce(new[] { message });
 
-        public async Task validateDuplicatedNonce(IEnumerable<SendMessage> messages)
+        private async Task validateDuplicatedNonce(IEnumerable<SendMessage> messages)
         {
             fixture.Register<MessageContent>(() => fixture.Create<NotificationContent>());
             var clientMock = fixture.Create<Mock<IClientProxy>>();
@@ -626,6 +641,26 @@ namespace TTSS.RealTimeUpdate.Services.Tests
                     It.IsAny<string>(),
                     It.IsAny<object[]>(),
                     It.IsAny<CancellationToken>()), Times.Never());
+        }
+
+        private bool validateInsertAsync<T>(MessageInfo actual, IEnumerable<SendMessage<T>> messages)
+            where T : MessageContent
+        {
+            actual.Should().NotBeNull();
+            return messages.Any(it =>
+                it.Nonce == actual.Nonce
+                && it.TargetGroups.Distinct().SequenceEqual(actual.TargetGroups)
+                && it.Filter.Scopes.Distinct().SequenceEqual(actual.Filter.Scopes)
+                && it.Filter.Activities.Distinct().SequenceEqual(actual.Filter.Activities)
+                && it.Content == actual.Content);
+        }
+
+        private bool validateSyncCoreAsyncParam<T>(object[] args, IEnumerable<SendMessage<T>> messages, long currentTime)
+            where T : MessageContent
+        {
+            args.Should().HaveCount(2);
+            args.First().Should().Be(currentTime);
+            return messages.Any(it => it.Filter == args.Last());
         }
 
         #endregion

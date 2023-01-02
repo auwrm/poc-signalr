@@ -84,8 +84,12 @@ namespace TTSS.RealTimeUpdate.Services
                 Content = content,
                 Nonce = message.Nonce,
                 CreatedDate = dateTimeService.UtcNow,
-                Filter = message.Filter,
-                TargetGroups = message.TargetGroups,
+                Filter = new()
+                {
+                    Scopes = message.Filter.Scopes.Distinct(),
+                    Activities = message.Filter.Activities.Distinct(),
+                },
+                TargetGroups = message.TargetGroups.Distinct(),
             });
 
             foreach (var group in message.TargetGroups.Distinct())
