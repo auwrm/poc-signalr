@@ -45,7 +45,7 @@ namespace TTSS.RealTimeUpdate.Services.Tests
         [Fact]
         public async Task RequestOTP_AllDataValid_ThenSendASecretCodeBackToTheCaller()
         {
-            var clientMock = fixture.Create<Mock<ISingleClientProxy>>();
+            var clientMock = fixture.Create<Mock<IClientProxy>>();
             hubClientsMock
                 .Setup(it => it.Client(It.IsAny<string>()))
                 .Returns<string>(_ => clientMock.Object);
@@ -83,7 +83,7 @@ namespace TTSS.RealTimeUpdate.Services.Tests
 
         private async Task validateInvalidParam_MustDoNothing(InvocationContext req)
         {
-            var clientMock = fixture.Create<Mock<ISingleClientProxy>>();
+            var clientMock = fixture.Create<Mock<IClientProxy>>();
             hubClientsMock
                 .Setup(it => it.Client(It.IsAny<string>()))
                 .Returns<string>(_ => clientMock.Object);

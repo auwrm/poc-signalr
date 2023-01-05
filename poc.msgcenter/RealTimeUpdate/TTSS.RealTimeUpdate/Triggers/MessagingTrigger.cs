@@ -1,9 +1,11 @@
 ﻿using Microsoft.AspNetCore.Http;
-using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.SignalR.Management;
 using Microsoft.Azure.WebJobs;
+using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Extensions.SignalRService;
+using System.Linq;
 using System.Security.Claims;
+using System.Threading.Tasks;
 using TTSS.RealTimeUpdate.Services;
 
 namespace TTSS.RealTimeUpdate.Triggers
