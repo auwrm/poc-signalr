@@ -2,6 +2,7 @@
 using AutoFixture.Xunit2;
 using FluentAssertions;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Azure.SignalR.Management;
 using Microsoft.Azure.WebJobs.Extensions.SignalRService;
 using Moq;
 using System.Linq.Expressions;
@@ -9,7 +10,6 @@ using TTSS.Infrastructure.Data.Mongo;
 using TTSS.Infrastructure.Services;
 using TTSS.Infrastructure.Services.Models;
 using TTSS.RealTimeUpdate.Services.DbModels;
-using TTSS.RealTimeUpdate.Services.Models;
 
 namespace TTSS.RealTimeUpdate.Services.Tests
 {
@@ -21,6 +21,8 @@ namespace TTSS.RealTimeUpdate.Services.Tests
         private readonly Mock<IGroupManager> groupManagerMock;
         private readonly Mock<IDateTimeService> datetimeSvcMock;
         private readonly Mock<IMongoRepository<MessageInfo, string>> mongoRepoMock;
+        private readonly Mock<IServiceManager> serviceManagerMock;
+        private readonly Mock<IServiceHubContext> serviceHubContextMock;
         private readonly Func<DateTime> GetCurrentTime;
 
         private IMessagingCenterHub sut => fixture.Create<MessagingCenterHub>();
@@ -32,12 +34,22 @@ namespace TTSS.RealTimeUpdate.Services.Tests
             fixture.Register<IGroupManager>(() => groupManagerMock.Object);
             fixture.Register<IDateTimeService>(() => datetimeSvcMock.Object);
             fixture.Register<IMongoRepository<MessageInfo, string>>(() => mongoRepoMock.Object);
+            fixture.Register<IServiceManager>(() => serviceManagerMock.Object);
+            fixture.Register<IServiceHubContext>(() => serviceHubContextMock.Object);
             hubClientsMock = fixture.Create<Mock<IHubClients>>();
             groupManagerMock = fixture.Create<Mock<IGroupManager>>();
             datetimeSvcMock = fixture.Create<Mock<IDateTimeService>>();
             mongoRepoMock = fixture.Create<Mock<IMongoRepository<MessageInfo, string>>>();
+            serviceManagerMock = fixture.Create<Mock<IServiceManager>>();
+            serviceHubContextMock = fixture.Create<Mock<IServiceHubContext>>();
             GetCurrentTime = () => currentTime;
             datetimeSvcMock.Setup(it => it.UtcNow).Returns(GetCurrentTime);
+            serviceHubContextMock
+                .Setup(it => it.Clients)
+                .Returns(hubClientsMock.Object);
+            serviceHubContextMock
+                .Setup(it => it.Groups)
+                .Returns(groupManagerMock.Object);
         }
 
         #region RequestOTP
@@ -112,7 +124,11 @@ namespace TTSS.RealTimeUpdate.Services.Tests
 
             var req = fixture.Create<JoinGroupRequest>();
             req.Secret = secret;
-            (await sut.JoinGroup(req)).Should().BeTrue();
+            var actual = await sut.JoinGroup(req);
+            actual.Should().NotBeNull();
+            actual.ErrorMessage.Should().BeNull();
+            actual.Nonce.Should().Be(req.Nonce);
+            actual.JoinGroupName.Should().Be(req.GroupName);
 
             hubClientsMock
                 .Verify(it => it.User(It.Is<string>(actual => actual == secret)), Times.Exactly(1));
@@ -132,7 +148,11 @@ namespace TTSS.RealTimeUpdate.Services.Tests
                 .Returns<string>(_ => null);
 
             var req = fixture.Create<JoinGroupRequest>();
-            (await sut.JoinGroup(req)).Should().BeFalse();
+            var actual = await sut.JoinGroup(req);
+            actual.Should().NotBeNull();
+            actual.ErrorMessage.Should().NotBeNullOrEmpty();
+            actual.Nonce.Should().Be(req.Nonce);
+            actual.JoinGroupName.Should().BeNullOrEmpty();
 
             hubClientsMock
                 .Verify(it => it.User(It.IsAny<string>()), Times.Exactly(1));
@@ -151,7 +171,7 @@ namespace TTSS.RealTimeUpdate.Services.Tests
         [InlineData("valid", "")]
         [InlineData("valid", " ")]
         public Task JoinGroup_WithInvalidParam_ThenSystemDoNothing(string secret, string groupName)
-            => validateJoinGroupWithInvalidParam(new JoinGroupRequest
+            => validateJoinGroupWithInvalidParam(new()
             {
                 Secret = secret,
                 GroupName = groupName,
@@ -168,7 +188,11 @@ namespace TTSS.RealTimeUpdate.Services.Tests
                 .Setup(it => it.User(It.IsAny<string>()))
                 .Returns<string>(cid => clientMock.Object);
 
-            (await sut.JoinGroup(req)).Should().BeFalse();
+            var actual = await sut.JoinGroup(req);
+            actual.Should().NotBeNull();
+            actual.ErrorMessage.Should().NotBeNullOrEmpty();
+            actual.Nonce.Should().Be(req?.Nonce);
+            actual.JoinGroupName.Should().BeNullOrEmpty();
 
             hubClientsMock
                 .Verify(it => it.User(It.IsAny<string>()), Times.Never());

@@ -1,30 +1,49 @@
 ﻿using Microsoft.AspNetCore.SignalR;
+using Microsoft.Azure.SignalR.Management;
 using Microsoft.Azure.WebJobs.Extensions.SignalRService;
 using TTSS.Infrastructure.Data.Mongo;
 using TTSS.Infrastructure.Services;
 using TTSS.Infrastructure.Services.Models;
 using TTSS.Infrastructure.Services.Validators;
 using TTSS.RealTimeUpdate.Services.DbModels;
-using TTSS.RealTimeUpdate.Services.Models;
 
 namespace TTSS.RealTimeUpdate.Services
 {
-    public class MessagingCenterHub : IMessagingCenterHub
+    public class MessagingCenterHub : ServerlessHub, IMessagingCenterHub
     {
-        private readonly IHubClients hubClients;
-        private readonly IGroupManager groupManager;
         private readonly IDateTimeService dateTimeService;
         private readonly IMongoRepository<MessageInfo, string> messageRepo;
 
-        public MessagingCenterHub(IHubClients hubClients,
-            IGroupManager groupManager,
-            IDateTimeService dateTimeService,
-            IMongoRepository<MessageInfo, string> messageRepo)
+        public MessagingCenterHub(IDateTimeService dateTimeService,
+            IMongoRepository<MessageInfo, string> messageRepo,
+            IServiceHubContext hubContext,
+            IServiceManager serviceManager)
+            : base(hubContext, serviceManager)
         {
-            this.hubClients = hubClients ?? throw new ArgumentNullException(nameof(hubClients));
-            this.groupManager = groupManager ?? throw new ArgumentNullException(nameof(groupManager));
             this.dateTimeService = dateTimeService ?? throw new ArgumentNullException(nameof(dateTimeService));
             this.messageRepo = messageRepo ?? throw new ArgumentNullException(nameof(messageRepo));
+        }
+
+        public async Task<JoinGroupResponse> JoinGroup(JoinGroupRequest req)
+        {
+            if (!req.Validate()) return createError();
+
+            var client = Clients.User(req.Secret);
+            if (null == client) return createError();
+
+            await Groups.AddToGroupAsync(req.Secret, req.GroupName);
+            return new()
+            {
+                Nonce = req.Nonce,
+                JoinGroupName = req.GroupName,
+            };
+
+            JoinGroupResponse createError(string msg = "Invalid request, some parameters are invalid or missing")
+                => new()
+                {
+                    Nonce = req?.Nonce,
+                    ErrorMessage = msg,
+                };
         }
 
         public async Task SendClientSecret(InvocationContext context)
@@ -32,23 +51,10 @@ namespace TTSS.RealTimeUpdate.Services
             var isArgumentValid = !string.IsNullOrWhiteSpace(context?.ConnectionId);
             if (!isArgumentValid) return;
 
-            var client = hubClients?.Client(context.ConnectionId);
+            var client = Clients?.Client(context.ConnectionId);
             if (null == client) return;
 
             await client.SendAsync("setClientId", context.ConnectionId);
-        }
-
-        public async Task<bool> JoinGroup(JoinGroupRequest req)
-        {
-            var isArgumentValid = !string.IsNullOrWhiteSpace(req?.Secret)
-                && !string.IsNullOrWhiteSpace(req?.GroupName);
-            if (!isArgumentValid) return false;
-
-            var client = hubClients.User(req.Secret);
-            if (null == client) return false;
-
-            await groupManager.AddToGroupAsync(req.Secret, req.GroupName);
-            return true;
         }
 
         public Task LeaveGroup(InvocationContext context) => throw new NotImplementedException();
@@ -94,7 +100,7 @@ namespace TTSS.RealTimeUpdate.Services
 
             foreach (var group in message.TargetGroups.Distinct())
             {
-                var proxy = hubClients.Group(group);
+                var proxy = Clients.Group(group);
                 if (null == proxy) continue;
                 await proxy.SendAsync("update", eventId, message.Filter);
             }

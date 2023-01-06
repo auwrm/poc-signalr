@@ -1,9 +1,8 @@
-﻿using Microsoft.Azure.WebJobs.Extensions.SignalRService;
-
-namespace TTSS.RealTimeUpdate.Services.Models
+﻿namespace TTSS.Infrastructure.Services.Models
 {
     public class JoinGroupRequest
     {
+        public string Nonce { get; set; }
         public string Secret { get; set; }
         public string GroupName { get; set; }
     }

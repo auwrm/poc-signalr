@@ -1,39 +1,45 @@
 ﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.SignalR.Management;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Extensions.SignalRService;
-using System.Linq;
-using System.Security.Claims;
+using Microsoft.Extensions.Logging;
 using System.Threading.Tasks;
+using TTSS.Infrastructure.Data.Mongo;
+using TTSS.Infrastructure.Services;
+using TTSS.Infrastructure.Services.Models;
 using TTSS.RealTimeUpdate.Services;
+using TTSS.RealTimeUpdate.Services.DbModels;
 
 namespace TTSS.RealTimeUpdate.Triggers
 {
-    public class MessagingTrigger : ServerlessHub
+    public class MessagingTrigger : MessagingCenterHub
     {
-        private readonly IMessagingCenterHub hub;
-
-        public MessagingTrigger(IMessagingCenterHub hub)
-            => this.hub = hub;
-
-        [FunctionName("negotiate")]
-        public Task<SignalRConnectionInfo> NegotiateAsync([HttpTrigger(AuthorizationLevel.Anonymous)] HttpRequest req)
+        public MessagingTrigger(IDateTimeService dateTimeService,
+            IMongoRepository<MessageInfo, string> messageRepo,
+            IServiceHubContext hubContext = null, IServiceManager serviceManager = null)
+            : base(dateTimeService, messageRepo, hubContext, serviceManager)
         {
-            var claims = GetClaims(req.Headers["Authorization"]);
-            return NegotiateAsync(new NegotiationOptions
-            {
-                UserId = claims.First(c => c.Type == ClaimTypes.NameIdentifier).Value,
-                Claims = claims,
-            });
         }
+
+        [FunctionName(nameof(Negotiate))]
+        public Task<SignalRConnectionInfo> Negotiate(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequest req,
+            [SignalRConnectionInfo(HubName = nameof(MessagingCenter))] SignalRConnectionInfo connectionInfo)
+            => Task.FromResult(connectionInfo);
 
         [FunctionName(nameof(OnConnected))]
         public Task OnConnected([SignalRTrigger] InvocationContext invocationContext)
-            => hub.SendClientSecret(invocationContext);
+            => SendClientSecret(invocationContext);
 
         [FunctionName(nameof(OnDisconnected))]
         public void OnDisconnected([SignalRTrigger] InvocationContext invocationContext)
-            => hub.LeaveGroup(invocationContext);
+            => LeaveGroup(invocationContext);
+
+        [FunctionName(nameof(JoinGroup))]
+        public Task<JoinGroupResponse> JoinGroupAsync(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "post")] JoinGroupRequest body)
+            => JoinGroup(body);
     }
 }
