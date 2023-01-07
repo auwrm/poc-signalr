@@ -10,35 +10,51 @@ IRestService restService = new RestService();
 MessagingCenterOptions options = config.GetRequiredSection(nameof(MessagingCenterOptions)).Get<MessagingCenterOptions>();
 IMessagingCenter messagingCenter = new MessagingCenter(restService, options);
 
-Console.WriteLine(options.HostUrl);
 var hubConnection = new HubConnectionBuilder()
-    .WithUrl($"{options.HostUrl}/api")
+    .WithUrl($"http://{options.HostFQDN}/api")
     .WithAutomaticReconnect()
     .Build();
 
-try
+const string GroupName = "Test";
+var joinGroupTask = new TaskCompletionSource<string>();
+hubConnection.On<string>("setClientId", async otp =>
 {
-    await hubConnection.StartAsync();
-    Console.WriteLine("Connected");
-
+    Console.WriteLine($"Received OTP: {otp}");
     var joinResult = await messagingCenter.JoinGroup(new()
     {
-        GroupName = "Test",
+        Secret = otp,
+        GroupName = GroupName,
         Nonce = Guid.NewGuid().ToString(),
-        Secret = hubConnection.ConnectionId,
     });
 
     if (!string.IsNullOrWhiteSpace(joinResult.ErrorMessage))
     {
-        Console.WriteLine($"Join failed: {joinResult.ErrorMessage}");
-        return;
+        Console.WriteLine($"Join group: {GroupName}, failed: {joinResult.ErrorMessage}");
+        joinGroupTask.TrySetResult(string.Empty);
     }
+    else
+    {
+        Console.WriteLine($"Join group: {joinResult.JoinGroupName}, success");
+        joinGroupTask.TrySetResult(otp);
+    }
+});
 
-    Console.WriteLine($"Join group: {joinResult.JoinGroupName}");
+try
+{
+    Console.Write($"Connect SignalR: {options.HostFQDN}");
+    await hubConnection.StartAsync();
+    Console.WriteLine(", Connected");
 }
 catch (Exception ex)
 {
-    Console.WriteLine(ex);
+    Console.WriteLine($", {ex.Message}");
+}
+
+var secret = await joinGroupTask.Task;
+if (string.IsNullOrWhiteSpace(secret))
+{
+    Console.WriteLine("Exit");
+    return;
 }
 
 Console.ReadLine();

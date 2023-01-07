@@ -26,7 +26,7 @@ namespace TTSS.RealTimeUpdate.Triggers
         [FunctionName(nameof(Negotiate))]
         public Task<SignalRConnectionInfo> Negotiate(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequest req,
-            [SignalRConnectionInfo(HubName = nameof(MessagingCenter))] SignalRConnectionInfo connectionInfo)
+            [SignalRConnectionInfo(HubName = nameof(MessagingTrigger))] SignalRConnectionInfo connectionInfo)
             => Task.FromResult(connectionInfo);
 
         [FunctionName(nameof(OnConnected))]

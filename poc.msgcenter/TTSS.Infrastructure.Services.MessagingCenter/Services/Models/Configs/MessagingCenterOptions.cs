@@ -2,6 +2,6 @@
 {
     public class MessagingCenterOptions
     {
-        public string HostUrl { get; set; }
+        public string HostFQDN { get; set; }
     }
 }

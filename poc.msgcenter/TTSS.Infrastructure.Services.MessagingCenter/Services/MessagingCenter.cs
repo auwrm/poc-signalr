@@ -9,14 +9,33 @@ namespace TTSS.Infrastructure.Services
         private readonly IRestService restService;
         private readonly MessagingCenterOptions messagingCenterOptions;
 
-        private string hostUrl;
-        private string HostUrl => hostUrl ??= messagingCenterOptions?.HostUrl;
+        private string hostFQDN;
+        private string HostFQDN => hostFQDN ??= messagingCenterOptions?.HostFQDN;
 
         public MessagingCenter(IRestService restService,
             MessagingCenterOptions msgCenterOptions)
         {
             this.restService = restService;
             messagingCenterOptions = msgCenterOptions;
+        }
+
+        public async Task<JoinGroupResponse> JoinGroup(JoinGroupRequest req)
+        {
+            if (!req.Validate()) return createError("Parameter invalid.");
+
+            var builder = new UriBuilder(HostFQDN)
+            {
+                Path = $"/api/{nameof(JoinGroup)}",
+            };
+            var rsp = await restService.Post<JoinGroupRequest, JoinGroupResponse>(builder.Uri.AbsoluteUri, req);
+            return (rsp?.IsSuccessStatusCode ?? false) ? rsp.Data : createError("Can't send request to the Messaging Center Service");
+
+            JoinGroupResponse createError(string msg)
+                => new()
+                {
+                    Nonce = req?.Nonce,
+                    ErrorMessage = msg,
+                };
         }
 
         public Task<SendMessageResponse?> Send(SendMessage message)
@@ -28,8 +47,7 @@ namespace TTSS.Infrastructure.Services
 
             var builder = new UriBuilder
             {
-                Host = HostUrl,
-                Scheme = "https",
+                Host = HostFQDN,
             };
             var rsp = await restService.Post<IEnumerable<SendMessage>, SendMessageResponse>(builder.Uri.AbsoluteUri, messages);
             return (rsp?.IsSuccessStatusCode ?? false) ? rsp.Data : createError("Can't send message to the Messaging Center Service", rsp?.Data?.NonceStatus);
@@ -46,8 +64,7 @@ namespace TTSS.Infrastructure.Services
             var activities = $"activities={string.Join(',', request.Filter.Activities.Distinct())}";
             var builder = new UriBuilder
             {
-                Host = HostUrl,
-                Scheme = "https",
+                Host = HostFQDN,
                 Query = $"{scopes}&{activities}",
                 Path = $"{request.UserId}/{request.FromGroup}/{request.FromMessageId}",
             };
@@ -63,8 +80,7 @@ namespace TTSS.Infrastructure.Services
             var activities = $"activities={string.Join(',', request.Filter.Activities.Distinct())}";
             var builder = new UriBuilder
             {
-                Host = HostUrl,
-                Scheme = "https",
+                Host = HostFQDN,
                 Query = $"{scopes}&{activities}",
                 Path = $"{request.UserId}/{request.FromGroup}/more/{request.FromMessageId}",
             };
@@ -80,8 +96,7 @@ namespace TTSS.Infrastructure.Services
             var thru = $"thru={request.ThruMessageId}";
             var builder = new UriBuilder
             {
-                Host = HostUrl,
-                Scheme = "https",
+                Host = HostFQDN,
                 Query = $"{from}&{thru}",
                 Path = request.UserId,
             };
@@ -95,8 +110,7 @@ namespace TTSS.Infrastructure.Services
 
             var builder = new UriBuilder
             {
-                Host = HostUrl,
-                Scheme = "https",
+                Host = HostFQDN,
             };
             await restService.Put(builder.Uri.AbsoluteUri, request);
             return true;

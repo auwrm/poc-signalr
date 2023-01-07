@@ -17,7 +17,7 @@ namespace TTSS.Infrastructure.Services.Tests
         private Mock<IRestService> restServiceMock;
         private MessagingCenterOptions msgCenterOpt;
         private const string HostFQDN = "www.msgcenter.com";
-        private string ExpectedHostUrl => $"https://{HostFQDN}/";
+        private string ExpectedHostUrl => $"http://{HostFQDN}/";
 
         public MessagingCenterTests(ITestOutputHelper testOutput) : base(testOutput)
         {
@@ -25,7 +25,7 @@ namespace TTSS.Infrastructure.Services.Tests
                 .Customize(new AutoMoqCustomization());
             restServiceMock = fixture.Freeze<Mock<IRestService>>();
             msgCenterOpt = fixture.Freeze<MessagingCenterOptions>();
-            msgCenterOpt.HostUrl = HostFQDN;
+            msgCenterOpt.HostFQDN = HostFQDN;
             sut = fixture.Create<MessagingCenter>();
         }
 
