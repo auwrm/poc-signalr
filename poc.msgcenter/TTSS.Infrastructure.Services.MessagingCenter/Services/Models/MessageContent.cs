@@ -8,7 +8,7 @@
     public class DynamicContent : MessageContent
     {
         public object Data { get; set; }
-        public string ContentType => Data.GetType().Name;
+        public string ContentType { get; set; }
         public override string Type => MessageType.Dynamic.ToString();
     }
 

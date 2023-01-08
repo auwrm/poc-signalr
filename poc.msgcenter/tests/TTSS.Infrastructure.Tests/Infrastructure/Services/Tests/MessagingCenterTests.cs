@@ -55,7 +55,7 @@ namespace TTSS.Infrastructure.Services.Tests
                 .Returns<string, IEnumerable<SendMessage>>((_, _) => Task.FromResult(result));
             (await sut.Send(messages)).Should().BeEquivalentTo(result.Data);
             restServiceMock.Verify(it => it.Post<IEnumerable<SendMessage>, SendMessageResponse>(
-                It.Is<string>(actual => actual == ExpectedHostUrl),
+                It.Is<string>(actual => actual == $"{ExpectedHostUrl}api/Send"),
                 It.Is<IEnumerable<SendMessage>>(actual => actual == messages)), Times.Exactly(1));
         }
 

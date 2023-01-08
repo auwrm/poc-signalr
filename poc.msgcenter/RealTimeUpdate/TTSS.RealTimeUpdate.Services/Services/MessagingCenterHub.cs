@@ -67,20 +67,15 @@ namespace TTSS.RealTimeUpdate.Services
             var hasDone = messageRepo.Get(it => it.Nonce == message.Nonce && it.CreatedDate >= fromTime).Count() > 0;
             if (hasDone) return createError("Duplicated request.");
 
-            // TODO: Simplify the DB model
-            MessageContent content = null;
-            if (message is SendMessage<DynamicContent> dynamic)
+            var content = message switch
             {
-                content = dynamic.Content;
-            }
-            else if (message is SendMessage<NotificationContent> noti)
-            {
-                content = noti.Content;
-            }
-            else
-            {
-                throw new NotSupportedException("Not support this message content");
-            }
+                SendMessage<MessageContent> msg => msg.Content,
+                SendMessage<DynamicContent> msg => msg.Content,
+                SendMessage<NotificationContent> msg => msg.Content,
+                _ => null,
+            };
+
+            if (null == content) throw new NotSupportedException("Not support this message content");
 
             // TODO: Simplify the DB model
             var eventId = dateTimeService.UtcNow.Ticks;
@@ -98,6 +93,7 @@ namespace TTSS.RealTimeUpdate.Services
                 TargetGroups = message.TargetGroups.Distinct(),
             });
 
+            // TODO: Send to groups must be done in the Send(IEnumerable<SendMessage>) for improve performance.
             foreach (var group in message.TargetGroups.Distinct())
             {
                 var proxy = Clients.Group(group);

@@ -10,9 +10,6 @@
     public class SendMessage<T> : SendMessage
         where T : MessageContent
     {
-        public T Content { get; init; }
-
-        public SendMessage(T content)
-            => Content = content ?? throw new ArgumentNullException(nameof(content));
+        public T Content { get; set; }
     }
 }

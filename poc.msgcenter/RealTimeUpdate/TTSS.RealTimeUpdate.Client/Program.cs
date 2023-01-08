@@ -1,6 +1,8 @@
 ﻿using Microsoft.AspNetCore.SignalR.Client;
 using Microsoft.Extensions.Configuration;
+using System.Text.Json;
 using TTSS.Infrastructure.Services;
+using TTSS.Infrastructure.Services.Models;
 using TTSS.Infrastructure.Services.Models.Configs;
 
 IConfiguration config = new ConfigurationBuilder()
@@ -38,6 +40,11 @@ hubConnection.On<string>("setClientId", async otp =>
         joinGroupTask.TrySetResult(otp);
     }
 });
+hubConnection.On<long, MessageFilter>("update", (eventId, filter) =>
+{
+    var filterTxt = JsonSerializer.Serialize(filter);
+    Console.WriteLine($"Got an update EventId: {eventId}, filter: {filterTxt}");
+});
 
 try
 {
@@ -56,5 +63,30 @@ if (string.IsNullOrWhiteSpace(secret))
     Console.WriteLine("Exit");
     return;
 }
+
+var rsp = await messagingCenter.Send(new SendMessage<NotificationContent>
+{
+    Nonce = Guid.NewGuid().ToString(),
+    TargetGroups = new[] { GroupName },
+    Filter = new MessageFilter
+    {
+        Scopes = new[] { "scope1", "scope2" },
+        Activities = new[] { "act1", "act2" },
+    },
+    Content = new NotificationContent
+    {
+        EndpointUrl = "https://www.google.com",
+        Message = "msg1",
+    },
+});
+
+if (!string.IsNullOrWhiteSpace(rsp.ErrorMessage))
+{
+    Console.WriteLine($"Send fail, reason: {rsp.ErrorMessage}");
+    return;
+}
+
+Console.WriteLine($"Send message success");
+
 
 Console.ReadLine();

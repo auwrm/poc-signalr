@@ -1,16 +1,20 @@
 ﻿using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.SignalR.Management;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Azure.WebJobs.Extensions.SignalRService;
-using Microsoft.Extensions.Logging;
+using System.Collections.Generic;
+using System.Net.Http;
+//using System.Text.Json;
+//using System.Text.Json.Serialization;
+using System.Text.Json;
 using System.Threading.Tasks;
 using TTSS.Infrastructure.Data.Mongo;
 using TTSS.Infrastructure.Services;
 using TTSS.Infrastructure.Services.Models;
 using TTSS.RealTimeUpdate.Services;
 using TTSS.RealTimeUpdate.Services.DbModels;
+using JsonSerializer = System.Text.Json.JsonSerializer;
 
 namespace TTSS.RealTimeUpdate.Triggers
 {
@@ -41,5 +45,16 @@ namespace TTSS.RealTimeUpdate.Triggers
         public Task<JoinGroupResponse> JoinGroupAsync(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post")] JoinGroupRequest body)
             => JoinGroup(body);
+
+        [FunctionName(nameof(Send))]
+        public async Task<SendMessageResponse> SendAsync(
+            [HttpTrigger(AuthorizationLevel.Anonymous, "post")] HttpRequestMessage body)
+        {
+            var requestBodyText = await body.Content.ReadAsStringAsync();
+            var deserializeOptions = new JsonSerializerOptions();
+            deserializeOptions.Converters.Add(new SendMessageConverter());
+            var messages = JsonSerializer.Deserialize<IEnumerable<SendMessage<MessageContent>>>(requestBodyText, deserializeOptions)!;
+            return await Send(messages);
+        }
     }
 }

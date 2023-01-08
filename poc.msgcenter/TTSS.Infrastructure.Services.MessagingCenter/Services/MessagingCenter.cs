@@ -45,9 +45,9 @@ namespace TTSS.Infrastructure.Services
         {
             if (!messages.Validate()) return createError("Nonce, Filter and TargetGroup can't be null or empty.");
 
-            var builder = new UriBuilder
+            var builder = new UriBuilder(HostFQDN)
             {
-                Host = HostFQDN,
+                Path = $"/api/{nameof(Send)}",
             };
             var rsp = await restService.Post<IEnumerable<SendMessage>, SendMessageResponse>(builder.Uri.AbsoluteUri, messages);
             return (rsp?.IsSuccessStatusCode ?? false) ? rsp.Data : createError("Can't send message to the Messaging Center Service", rsp?.Data?.NonceStatus);
@@ -62,9 +62,8 @@ namespace TTSS.Infrastructure.Services
 
             var scopes = $"scopes={string.Join(',', request.Filter.Scopes.Distinct())}";
             var activities = $"activities={string.Join(',', request.Filter.Activities.Distinct())}";
-            var builder = new UriBuilder
+            var builder = new UriBuilder(HostFQDN)
             {
-                Host = HostFQDN,
                 Query = $"{scopes}&{activities}",
                 Path = $"{request.UserId}/{request.FromGroup}/{request.FromMessageId}",
             };
@@ -78,9 +77,8 @@ namespace TTSS.Infrastructure.Services
 
             var scopes = $"scopes={string.Join(',', request.Filter.Scopes.Distinct())}";
             var activities = $"activities={string.Join(',', request.Filter.Activities.Distinct())}";
-            var builder = new UriBuilder
+            var builder = new UriBuilder(HostFQDN)
             {
-                Host = HostFQDN,
                 Query = $"{scopes}&{activities}",
                 Path = $"{request.UserId}/{request.FromGroup}/more/{request.FromMessageId}",
             };
@@ -94,9 +92,8 @@ namespace TTSS.Infrastructure.Services
 
             var from = $"from={request.FromMessageId}";
             var thru = $"thru={request.ThruMessageId}";
-            var builder = new UriBuilder
+            var builder = new UriBuilder(HostFQDN)
             {
-                Host = HostFQDN,
                 Query = $"{from}&{thru}",
                 Path = request.UserId,
             };
@@ -108,10 +105,7 @@ namespace TTSS.Infrastructure.Services
         {
             if (!request.Validate()) return false;
 
-            var builder = new UriBuilder
-            {
-                Host = HostFQDN,
-            };
+            var builder = new UriBuilder(HostFQDN);
             await restService.Put(builder.Uri.AbsoluteUri, request);
             return true;
         }
