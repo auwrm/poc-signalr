@@ -1,5 +1,4 @@
 ﻿using Flurl.Http;
-using Newtonsoft.Json;
 using TTSS.Infrastructure.Services.Models;
 
 namespace TTSS.Infrastructure.Services
@@ -7,9 +6,21 @@ namespace TTSS.Infrastructure.Services
     public class RestService : IRestService
     {
         public Task Get(string endpoint) => throw new NotImplementedException();
-        public Task<RestResponse<Response>> Get<Response>(string endpoint) where Response : class => throw new NotImplementedException();
+        public async Task<RestResponse<Response>> Get<Response>(string endpoint) where Response : class
+        {
+            var rsp = await endpoint.GetJsonAsync();
+            return new RestResponse<Response>()
+            {
+                StatusCode = rsp == null ? 500 : 200,
+                //Data = rsp ?? default,
+                IsSuccessStatusCode = rsp == null ? false : true,
+            };
+        }
 
-        public Task Put(string endpoint) => throw new NotImplementedException();
+        public async Task Put(string endpoint)
+        {
+            await endpoint.PutAsync();
+        }
         public Task Put<Request>(string endpoint, Request request) where Request : class => throw new NotImplementedException();
         public Task<RestResponse<Response>> Put<Response>(string endpoint) where Response : class => throw new NotImplementedException();
         public async Task<RestResponse<Response>> Put<Request, Response>(string endpoint, Request request) where Request : class where Response : class

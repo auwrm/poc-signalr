@@ -62,10 +62,13 @@ namespace TTSS.Infrastructure.Services
 
             var scopes = $"scopes={string.Join(',', request.Filter.Scopes.Distinct())}";
             var activities = $"activities={string.Join(',', request.Filter.Activities.Distinct())}";
+            var userId = $"userId={request.UserId}";
+            var fromGroup = $"fromGroup={request.FromGroup}";
+            var fromMessageId = $"fromMessageId={request.FromMessageId}";
             var builder = new UriBuilder(HostFQDN)
             {
-                Query = $"{scopes}&{activities}",
-                Path = $"{request.UserId}/{request.FromGroup}/{request.FromMessageId}",
+                Query = $"{scopes}&{activities}&{userId}&{fromGroup}&{fromMessageId}",
+                Path = $"/api/{nameof(SyncMessage)}",
             };
             var rsp = await restService.Get<MessagePack>(builder.Uri.AbsoluteUri);
             return (rsp?.IsSuccessStatusCode ?? false) ? rsp.Data : new() { Messages = Enumerable.Empty<Message>() };
@@ -77,10 +80,13 @@ namespace TTSS.Infrastructure.Services
 
             var scopes = $"scopes={string.Join(',', request.Filter.Scopes.Distinct())}";
             var activities = $"activities={string.Join(',', request.Filter.Activities.Distinct())}";
+            var userId = $"userId={request.UserId}";
+            var fromGroup = $"fromGroup={request.FromGroup}";
+            var fromMessageId = $"fromMessageId={request.FromMessageId}";
             var builder = new UriBuilder(HostFQDN)
             {
-                Query = $"{scopes}&{activities}",
-                Path = $"{request.UserId}/{request.FromGroup}/more/{request.FromMessageId}",
+                Query = $"{scopes}&{activities}&{userId}&{fromGroup}&{fromMessageId}",
+                Path = $"/api/{nameof(GetMoreMessages)}",
             };
             var rsp = await restService.Get<MessagePack>(builder.Uri.AbsoluteUri);
             return (rsp?.IsSuccessStatusCode ?? false) ? rsp.Data : new() { Messages = Enumerable.Empty<Message>() };
@@ -92,10 +98,11 @@ namespace TTSS.Infrastructure.Services
 
             var from = $"from={request.FromMessageId}";
             var thru = $"thru={request.ThruMessageId}";
+            var userId = $"userId={request.UserId}";
             var builder = new UriBuilder(HostFQDN)
             {
-                Query = $"{from}&{thru}",
-                Path = request.UserId,
+                Query = $"{from}&{thru}&{userId}",
+                Path = $"/api/{nameof(UpdateMessageTracker)}",
             };
             await restService.Put(builder.Uri.AbsoluteUri);
             return true;

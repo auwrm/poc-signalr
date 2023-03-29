@@ -20,7 +20,8 @@ namespace TTSS.RealTimeUpdate
                 var dbRunner = MongoDbRunner.Start();
                 var dbName = Guid.NewGuid().ToString();
                 var store = new MongoConnectionStoreBuilder(dbName, dbRunner.ConnectionString)
-                    .RegisterCollection<MessageInfo>(noDiscriminator: true)
+                    //.RegisterCollection<MessageInfo>(noDiscriminator: true)
+                    .RegisterCollection<MessageTrack>(noDiscriminator: true)
                     .Build();
                 return new MongoRepository<MessageInfo, string>(store, it => it.Id);
             });
